@@ -254,21 +254,32 @@ class Token:
                 asset = ScratchVar()
                 return Seq([
                     duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
+
                     uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
-                    asset.store(magic_load(uid.load(), Itob(Int(0)))),
-                    If (asset.load() == Itob(Int(0))).Then(Reject()),
+                    asset.store(magic_load(uid.load(), Int(0))),
+                    If (asset.load() == Int(0)).Then(Reject()),
                     
                     InnerTxnBuilder.Begin(),
                     InnerTxnBuilder.SetFields(
                         {
                             TxnField.type_enum: TxnType.AssetTransfer,
-                            TxnField.xfer_asset: Btoi(asset.load()),
+                            TxnField.xfer_asset: asset.load(),
                             TxnField.asset_amount: Btoi(Txn.application_args[5]),
                             TxnField.asset_receiver: Gtxn[0].sender(),
                         }
                     ),
                     InnerTxnBuilder.Submit(),
 
+                    Approve()
+                ])
+
+            def lookupAsset():
+                uid = ScratchVar()
+                asset = ScratchVar()
+                return Seq([
+                    uid.store(Concat(Txn.application_args[1], Txn.application_args[2])),
+                    asset.store(magic_load(uid.load(), Int(0))),
+                    Log(Itob(asset.load())),
                     Approve()
                 ])
 
@@ -286,7 +297,7 @@ class Token:
                     duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
 
                     uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
-                    If (magic_load(uid.load(), Itob(Int(0))) != Itob(Int(0))).Then(Approve()),
+                    If (magic_load(uid.load(), Int(0)) != Int(0)).Then(Approve()),
             
                     InnerTxnBuilder.Begin(),
                     InnerTxnBuilder.SetFields(
@@ -303,7 +314,7 @@ class Token:
                     ),
                     InnerTxnBuilder.Submit(),
             
-                    magic_store(uid.load(), Itob(InnerTxn.created_asset_id())),
+                    magic_store(uid.load(), InnerTxn.created_asset_id()),
 
                     Log(Itob(InnerTxn.created_asset_id())),
             
@@ -325,6 +336,7 @@ class Token:
                 METHOD = Txn.application_args[0]
                 handle_noop = Cond(
                     [METHOD == Bytes("createWrapped"), createWrapped()],
+                    [METHOD == Bytes("lookupAsset"), lookupAsset()],
                     [METHOD == Bytes("redeemWrapped"), redeemWrapped()],
                 )
                 return Cond(
@@ -416,12 +428,17 @@ class Token:
     
         client.send_transactions([signedPayTxn, signedAppCallTxn])
     
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()))
+        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
 
     def redeemWrapped(self, client: AlgodClient, appID: int, bidder: Account, coin: int, coins: int) -> None:
         appAddr = get_application_address(appID)
     
         suggestedParams = client.suggested_params()
+
+        assetid = self.lookupAsset(client, appID, bidder, coin)
+
+        if (assetid == 0):
+            raise Exception('unknown asset')
     
         payTxn = transaction.PaymentTxn(
             sender=bidder.getAddress(),
@@ -441,6 +458,7 @@ class Token:
                       1,
                       coins
                       ],
+            foreign_assets = [ assetid ],
             sp=suggestedParams,
         )
 
@@ -453,7 +471,34 @@ class Token:
     
         client.send_transactions([signedPayTxn, signedAppCallTxn])
     
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()))
+        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
+
+    def lookupAsset(self, client: AlgodClient, appID: int, bidder: Account, coin: int) -> None:
+        appAddr = get_application_address(appID)
+    
+        suggestedParams = client.suggested_params()
+    
+        appCallTxn = transaction.ApplicationCallTxn(
+            sender=bidder.getAddress(),
+            index=appID,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"lookupAsset", self.coins[coin]["contract"], 1],
+            sp=suggestedParams,
+        )
+
+        transaction.assign_group_id([appCallTxn])
+    
+        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
+    
+        client.send_transactions([signedAppCallTxn])
+    
+        txn = self.waitForTransaction(client, appCallTxn.get_txid()).__dict__
+        if "logs" not in txn:
+            return 0
+        if len(txn["logs"]) == 0:
+            return 0
+
+        return int.from_bytes(txn["logs"][0], byteorder='big')
 
     def simple_token(self):
         client = self.getAlgodClient()
