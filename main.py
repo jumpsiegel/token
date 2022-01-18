@@ -230,7 +230,15 @@ class Token:
 
             def magic_store(key: TealType.bytes, val: any):
                 return Seq([App.globalPut(key, val)])
-            
+
+            def duplicateSup(key: TealType.bytes):
+                maybe = App.globalGetEx(Int(0), key)
+                return Seq([
+                    maybe,
+                    If(maybe.hasValue()).Then(Reject()),
+                    App.globalPut(key, Int(1))
+                ])
+
             def redeem():
                 return Seq([
                     Approve()
@@ -247,6 +255,8 @@ class Token:
                 mine = Global.current_application_address()
             
                 return Seq([
+                    duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
+
                     uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
                     If (magic_load(uid.load(), Int(0)) != Int(0)).Then(Approve()),
             
