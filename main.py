@@ -4,6 +4,7 @@ from base64 import b64decode
 import base64
 import random
 import hashlib
+import uuid
 
 from algosdk.v2client.algod import AlgodClient
 from algosdk.kmd import KMDClient
@@ -221,50 +222,42 @@ class Token:
         
     def getContracts(self, client: AlgodClient) -> Tuple[bytes, bytes]:
         if len(self.APPROVAL_PROGRAM) == 0:
+
             @Subroutine(TealType.anytype)
-            def global_get_else(key: TealType.bytes, default: Expr) -> Expr:
+            def magic_load(key: TealType.bytes, default: Expr) -> Expr:
                 maybe = App.globalGetEx(Int(0), key)
                 return Seq(maybe, If(maybe.hasValue(), maybe.value(), default))
-            
-            @Subroutine(TealType.anytype)
-            def stripByteArray(a: TealType.bytes) -> Expr:
-                i = ScratchVar(TealType.uint64)
-                return Seq(
-                    [
-                        For (i.store(Int(0)), i.load() < Len(a), i.store(i.load() + Int(1))).Do(
-                                If(GetByte(a, i.load()) == Int(0)).Then(Return(Extract(a, Int(0), i.load())))
-                        ),
-                        Return(a)
-                    ])
+
+            def magic_store(key: TealType.bytes, val: any):
+                return Seq([App.globalPut(key, val)])
             
             def redeem():
                 return Seq([
                     Approve()
                 ])
-            
+
+            # emitter - Txn.application_args[1]
+            # seq - Txn.application_args[2]
+            # contract - Txn.application_args[3]
+            # chain - Txn.application_args[4]
+            # name - Txn.application_args[5]
+
             def createWrapped():
-                digest = Txn.note()
                 uid = ScratchVar()
-                i = ScratchVar(TealType.uint64)
-                symbol = ScratchVar()
                 mine = Global.current_application_address()
             
                 return Seq([
-                    Assert(Btoi(Extract(digest, Int(51), Int(1))) == Int(2)),
-            
-                    symbol.store(stripByteArray(Extract(digest, Int(87), Int(32)))),
-            
-                    uid.store(Concat(Extract(digest, Int(52), Int(32)), Extract(digest, Int(84), Int(2)))),
-                    If (global_get_else(uid.load(), Int(0)) != Int(0)).Then(Approve()),
+                    uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
+                    If (magic_load(uid.load(), Int(0)) != Int(0)).Then(Approve()),
             
                     InnerTxnBuilder.Begin(),
                     InnerTxnBuilder.SetFields(
                         {
                             TxnField.type_enum: TxnType.AssetConfig,
-                            TxnField.config_asset_name: symbol.load(),
-                            TxnField.config_asset_unit_name: symbol.load(),
+                            TxnField.config_asset_name: Txn.application_args[5],
+                            TxnField.config_asset_unit_name: Txn.application_args[5],
                             TxnField.config_asset_total: Int(int(1e10)),  # Is this needed?
-                            TxnField.config_asset_decimals: Btoi(Extract(digest, Int(86), Int(1))),
+                            TxnField.config_asset_decimals: Int(8),
                             TxnField.config_asset_manager: mine,
                             TxnField.config_asset_reserve: mine,
                             TxnField.config_asset_clawback: mine,
@@ -272,7 +265,7 @@ class Token:
                     ),
                     InnerTxnBuilder.Submit(),
             
-                    App.globalPut(uid.load(), InnerTxn.created_asset_id()),
+                    magic_store(uid.load(), InnerTxn.created_asset_id()),
             
                     Approve()
                 ])
@@ -324,7 +317,7 @@ class Token:
     ) -> int:
         approval, clear = self.getContracts(client)
     
-        globalSchema = transaction.StateSchema(num_uints=2, num_byte_slices=6)
+        globalSchema = transaction.StateSchema(num_uints=40, num_byte_slices=6)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=0)
     
         app_args = [ ]
@@ -348,33 +341,86 @@ class Token:
         assert response.applicationIndex is not None and response.applicationIndex > 0
         return response.applicationIndex
 
-    # Rock-Scissors-Paper on the algorand block chain
+    def createWrapped(self, client: AlgodClient, appID: int, bidder: Account, bidAmount: int, coin: int) -> None:
+        appAddr = get_application_address(appID)
+    
+        suggestedParams = client.suggested_params()
+    
+        payTxn = transaction.PaymentTxn(
+            sender=bidder.getAddress(),
+            receiver=appAddr,
+            amt=bidAmount,
+            sp=suggestedParams,
+        )
+
+        appCallTxn = transaction.ApplicationCallTxn(
+            sender=bidder.getAddress(),
+            index=appID,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"createWrapped",
+                      self.emitter,
+                      self.seq,
+                      self.coins[coin]["contract"],
+                      1,
+                      self.coins[coin]["name"]
+                      ],
+            sp=suggestedParams,
+        )
+
+        self.seq = self.seq + 1
+
+        transaction.assign_group_id([payTxn, appCallTxn])
+    
+        signedPayTxn = payTxn.sign(bidder.getPrivateKey())
+        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
+    
+        client.send_transactions([signedPayTxn, signedAppCallTxn])
+    
+        self.waitForTransaction(client, appCallTxn.get_txid())
+
     def simple_token(self):
         client = self.getAlgodClient()
 
-        print("Generating the player accounts...")
-        player1 = self.getTemporaryAccount(client)
-
-        print("player1 assets")
-        pprint.pprint(self.getBalances(client, player1.getAddress()))
-
-        player2 = self.getTemporaryAccount(client)
-
-        print("player2 assets")
-        pprint.pprint(self.getBalances(client, player2.getAddress()))
+        print("Generating the foundation account...")
+        foundation = self.getTemporaryAccount(client)
 
         print("Creating the Token app")
-        appID = self.createTokenApp(
-            client=client,
-            sender=player1
-        )
+        appID = self.createTokenApp(client=client, sender=foundation)
         print("appID = " + str(appID))
 
+        player = self.getTemporaryAccount(client)
+
+        print("player assets")
+        pprint.pprint(self.getBalances(client, player.getAddress()))
+
         print("application state")
-        pprint.pprint(self.read_state(client, player1.getAddress(), appID))
+        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
 
         print("application assets")
         pprint.pprint(self.getBalances(client, get_application_address(appID)))
+
+        self.emitter = uuid.uuid4().hex
+        self.seq = 1
+        self.coins = []
+        for x in range(100):
+            self.coins.append({"contract": uuid.uuid4().hex, "name": "coin" + str(x)})
+
+        # In the real app, these createWrapped VAAs come as a
+        # cryptographically signed payload from the guardians and all
+        # the client is doing is submitting them.  For the purpose of
+        # this test, we are skipping that but pretend you normally
+        # cannot just be making up values
+
+        print("create wrapped coin 0")
+        self.createWrapped(client, appID, player, 201000, 0)
+
+        print("create wrapped coin 1")
+        self.createWrapped(client, appID, player, 101000, 1)
+
+        print("create wrapped coin 2")
+        self.createWrapped(client, appID, player, 101000, 2)
+
+        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
 
 token = Token()
 token.simple_token()
