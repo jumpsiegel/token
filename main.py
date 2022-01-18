@@ -239,8 +239,20 @@ class Token:
                     App.globalPut(key, Int(1))
                 ])
 
-            def redeem():
+            # emitter - Txn.application_args[1]
+            # seq - Txn.application_args[2]
+            # contract - Txn.application_args[3]
+            # chain - Txn.application_args[4]
+            # amount - Txn.application_args[5]
+
+            def redeemWrapped():
+                uid = ScratchVar()
+                asset = ScratchVar()
                 return Seq([
+                    duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
+                    uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
+                    asset.store(magic_load(uid.load(), Int(0))),
+                    If (asset.load() == Int(0)).Then(Reject()),
                     Approve()
                 ])
 
@@ -295,7 +307,7 @@ class Token:
                 METHOD = Txn.application_args[0]
                 handle_noop = Cond(
                     [METHOD == Bytes("createWrapped"), createWrapped()],
-                    [METHOD == Bytes("redeem"), redeem()],
+                    [METHOD == Bytes("redeemWrapped"), redeemWrapped()],
                 )
                 return Cond(
                     [Txn.application_id() == Int(0), handle_create],
@@ -388,6 +400,43 @@ class Token:
     
         self.waitForTransaction(client, appCallTxn.get_txid())
 
+    def redeemWrapped(self, client: AlgodClient, appID: int, bidder: Account, coin: int, coins: int) -> None:
+        appAddr = get_application_address(appID)
+    
+        suggestedParams = client.suggested_params()
+    
+        payTxn = transaction.PaymentTxn(
+            sender=bidder.getAddress(),
+            receiver=appAddr,
+            amt=1000,
+            sp=suggestedParams,
+        )
+
+        appCallTxn = transaction.ApplicationCallTxn(
+            sender=bidder.getAddress(),
+            index=appID,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"redeemWrapped",
+                      self.emitter,
+                      self.seq,
+                      self.coins[coin]["contract"],
+                      1,
+                      coins
+                      ],
+            sp=suggestedParams,
+        )
+
+        self.seq = self.seq + 1
+
+        transaction.assign_group_id([payTxn, appCallTxn])
+    
+        signedPayTxn = payTxn.sign(bidder.getPrivateKey())
+        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
+    
+        client.send_transactions([signedPayTxn, signedAppCallTxn])
+    
+        self.waitForTransaction(client, appCallTxn.get_txid())
+
     def simple_token(self):
         client = self.getAlgodClient()
 
@@ -431,6 +480,9 @@ class Token:
         self.createWrapped(client, appID, player, 101000, 2)
 
         pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+
+        print("redeme coin 0")
+        self.redeemWrapped(client, appID, player, 0, 1000)
 
 token = Token()
 token.simple_token()
