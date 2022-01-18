@@ -253,6 +253,18 @@ class Token:
                     uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
                     asset.store(magic_load(uid.load(), Int(0))),
                     If (asset.load() == Int(0)).Then(Reject()),
+                    
+                    InnerTxnBuilder.Begin(),
+                    InnerTxnBuilder.SetFields(
+                        {
+                            TxnField.type_enum: TxnType.AssetTransfer,
+                            TxnField.xfer_asset: asset.load(),
+                            TxnField.asset_amount: Btoi(Txn.application_args[5]),
+                            TxnField.asset_receiver: Gtxn[0].sender(),
+                        }
+                    ),
+                    InnerTxnBuilder.Submit(),
+
                     Approve()
                 ])
 
@@ -473,16 +485,15 @@ class Token:
         print("create wrapped coin 0")
         self.createWrapped(client, appID, player, 201000, 0)
 
-        print("create wrapped coin 1")
-        self.createWrapped(client, appID, player, 101000, 1)
-
-        print("create wrapped coin 2")
-        self.createWrapped(client, appID, player, 101000, 2)
-
-        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+#        print("create wrapped coin 1")
+#        self.createWrapped(client, appID, player, 101000, 1)
+#        print("create wrapped coin 2")
+#        self.createWrapped(client, appID, player, 101000, 2)
 
         print("redeme coin 0")
-        self.redeemWrapped(client, appID, player, 0, 1000)
+        self.redeemWrapped(client, appID, player, 0, 0)
+
+        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
 
 token = Token()
 token.simple_token()
