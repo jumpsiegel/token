@@ -343,11 +343,31 @@ class Token:
         def addBuffer():
             return Seq([
                 App.globalPut(Bytes("buffer"), Txn.application_args[1]),
+                Log(Txn.application_args[1]),
                 Approve()
             ])
 
         def setValue():
+            buf = ScratchVar()
             return Seq([
+                buf.store(App.globalGet(Bytes("buffer"))),
+#                Log(buf.load()),
+                App.globalGetEx(Btoi(buf.load()), Bytes("a")),
+
+#                InnerTxnBuilder.Begin(),
+#                InnerTxnBuilder.SetFields(
+#                    {
+#                        TxnField.type_enum: TxnType.AssetTransfer,
+#                        TxnField.xfer_asset: asset.load(),
+#                        TxnField.asset_amount: Btoi(Txn.application_args[5]),
+#                        TxnField.asset_receiver: Gtxn[0].sender(),
+#                    }
+#                ),
+#                InnerTxnBuilder.Submit(),
+
+                
+                Log(Txn.application_args[1]),
+                Log(Txn.application_args[2]),
                 Approve()
             ])
 
@@ -524,6 +544,29 @@ class Token:
     
         pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
 
+    def setValue(self, client: AlgodClient, appID: int, bidder: Account, key, val, dataID: int) -> None:
+        appAddr = get_application_address(appID)
+    
+        suggestedParams = client.suggested_params()
+    
+        appCallTxn = transaction.ApplicationCallTxn(
+            sender=bidder.getAddress(),
+            index=appID,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"setValue", key, val],
+            sp=suggestedParams,
+            foreign_apps = [dataID]
+        )
+
+        transaction.assign_group_id([appCallTxn])
+    
+        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
+    
+        client.send_transactions([signedAppCallTxn])
+    
+        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
+
+
     def createWrapped(self, client: AlgodClient, appID: int, bidder: Account, bidAmount: int, coin: int) -> None:
         appAddr = get_application_address(appID)
     
@@ -646,8 +689,13 @@ class Token:
         print("Creating the data")
         dataID = self.createDataApp(client=client, sender=player, owner = decode_address(get_application_address(appID)))
 
+        print("addBuffer")
         self.addBuffer(client, appID, player, dataID)
 
+        print("setValue")
+        self.setValue(client, appID, player, "a", "b", dataID)
+
+        print("printState")
         pprint.pprint(client.account_info(foundation.getAddress()))
         pprint.pprint(client.account_info(player.getAddress()))
         sys.exit(0)
