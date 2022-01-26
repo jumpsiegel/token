@@ -1,3 +1,10 @@
+# source .. few messages...
+#   <smartContract>  <EmitterChain>   ->   <algo asset>  <smartContract> <EmitterChain>
+#   <GovernanceIndex (int)> -> <algo app>      19 publicKeys for VAA signers  <32*19>
+
+# Lots of sequence numbers... optimize for space
+#   <EmitterSource> <SequenceNumber>  ->   <Bit>  (duplicate suppresion)
+
 from time import time, sleep
 from typing import List, Tuple, Dict, Any, Optional, Union
 from base64 import b64decode
