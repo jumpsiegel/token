@@ -317,6 +317,8 @@ class Token:
         appID = self.createTokenApp(client=client, sender=foundation)
         print("appID = " + str(appID))
 
+        print(open("boot.vaa", "r").read())
+
         player = self.getTemporaryAccount(client)
 
         pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
