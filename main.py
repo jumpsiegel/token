@@ -233,6 +233,7 @@ class Token:
         def init():
             return Seq([
                 Assert(Txn.sender() == Global.creator_address()),
+                Log(Extract(Txn.application_args[1], Int(0), Int(10))),
                 Approve()
             ])
 
@@ -306,6 +307,24 @@ class Token:
 
         return response.applicationIndex
 
+    def bootGuardians(self, vaa, client, sender, appid):
+        txn1 = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"init", vaa],
+            sp=client.suggested_params(),
+        )
+
+        transaction.assign_group_id([txn1])
+    
+        signedTxn1 = txn1.sign(sender.getPrivateKey())
+
+        client.send_transactions([signedTxn1])
+        response = self.waitForTransaction(client, signedTxn1.get_txid())
+        pprint.pprint(response.__dict__)
+        
+        pass
 
     def simple_token(self):
         client = self.getAlgodClient()
@@ -317,7 +336,10 @@ class Token:
         appID = self.createTokenApp(client=client, sender=foundation)
         print("appID = " + str(appID))
 
-        print(open("boot.vaa", "r").read())
+        # This sets the guardians
+        bootVAA = bytes.fromhex(open("boot.vaa", "r").read())
+
+        self.bootGuardians(bootVAA, client, foundation, appID)
 
         player = self.getTemporaryAccount(client)
 
