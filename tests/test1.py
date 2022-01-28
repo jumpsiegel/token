@@ -1,18 +1,9 @@
-# source .. few messages...
-#   <smartContract>  <EmitterChain>   ->   <algo asset>  <smartContract> <EmitterChain>
-#   <GovernanceIndex (int)> -> <algo app>      19 publicKeys for VAA signers  <32*19>
-
-# Lots of sequence numbers... optimize for space
-#   <EmitterSource> <SequenceNumber>  ->   <Bit>  (duplicate suppresion)
-
 from time import time, sleep
 from typing import List, Tuple, Dict, Any, Optional, Union
 from base64 import b64decode
 import base64
 import random
 import hashlib
-import uuid
-import sys
 
 from algosdk.v2client.algod import AlgodClient
 from algosdk.kmd import KMDClient
@@ -22,6 +13,7 @@ from algosdk.future import transaction
 from pyteal import compileTeal, Mode, Expr
 from pyteal import *
 from algosdk.logic import get_application_address
+from Cryptodome.Hash import SHA512
 
 import pprint
 
@@ -31,7 +23,7 @@ class Account:
     def __init__(self, privateKey: str) -> None:
         self.sk = privateKey
         self.addr = account.address_from_private_key(privateKey)
-        print (privateKey + " -> " + self.getMnemonic())
+        # print (privateKey + " -> " + self.getMnemonic())
 
     def getAddress(self) -> str:
         return self.addr
@@ -64,7 +56,7 @@ class PendingTxnResponse:
         self.innerTxns: List[Any] = response.get("inner-txns", [])
         self.logs: List[bytes] = [b64decode(l) for l in response.get("logs", [])]
 
-class Token:
+class TEST1:
     def __init__(self) -> None:
         self.ALGOD_ADDRESS = "http://localhost:4001"
         self.ALGOD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -136,7 +128,7 @@ class Token:
     
     def getTemporaryAccount(self, client: AlgodClient) -> Account:
         if len(self.accountList) == 0:
-            sks = [account.generate_account()[0] for i in range(3)]
+            sks = [account.generate_account()[0] for i in range(2)]
             self.accountList = [Account(sk) for sk in sks]
     
             genesisAccounts = self.getGenesisAccounts()
@@ -169,305 +161,152 @@ class Token:
     def getAlgodClient(self) -> AlgodClient:
         return AlgodClient(self.ALGOD_TOKEN, self.ALGOD_ADDRESS)
 
-    def getBalances(self, client: AlgodClient, account: str) -> Dict[int, int]:
-        balances: Dict[int, int] = dict()
-    
-        accountInfo = client.account_info(account)
-    
-        # set key 0 to Algo balance
-        balances[0] = accountInfo["amount"]
-    
-        assets: List[Dict[str, Any]] = accountInfo.get("assets", [])
-        for assetHolding in assets:
-            assetID = assetHolding["asset-id"]
-            amount = assetHolding["amount"]
-            balances[assetID] = amount
-    
-        return balances
+    def hashy(self, method: str) -> Bytes:
+        chksum = SHA512.new(truncate="256")
+        chksum.update(method)
+        return chksum.digest()
 
     def fullyCompileContract(self, client: AlgodClient, contract: Expr) -> bytes:
         teal = compileTeal(contract, mode=Mode.Application, version=5)
         response = client.compile(teal)
-        return response
-
-    # helper function that formats global state for printing
-    def format_state(self, state):
-        formatted = {}
-        for item in state:
-            key = item['key']
-            value = item['value']
-            formatted_key = base64.b64decode(key).decode('utf-8')
-            if value['type'] == 1:
-                # byte string
-                if formatted_key == 'voted':
-                    formatted_value = base64.b64decode(value['bytes']).decode('utf-8')
-                else:
-                    formatted_value = value['bytes']
-                formatted[formatted_key] = formatted_value
-            else:
-                # integer
-                formatted[formatted_key] = value['uint']
-        return formatted
-    
-    # helper function to read app global state
-    def read_global_state(self, client, addr, app_id):
-        results = client.account_info(addr)
-        apps_created = results['created-apps']
-        for app in apps_created:
-            if app['id'] == app_id and 'global-state' in app['params']:
-                return self.format_state(app['params']['global-state'])
-        return {}
+        r = b64decode(response["result"])
+        assert self.hashy( bytes("Program", 'utf-8') + r) == decode_address(response["hash"])
+        return [r, decode_address(response["hash"])]
 
     def read_state(self, client, addr, app_id):
         results = client.account_info(addr)
         apps_created = results['created-apps']
         for app in apps_created:
             if app['id'] == app_id:
-                return app
+                return app;
         return {}
-
-    def getDataContracts(self, client: AlgodClient) -> Tuple[bytes, bytes]:
-        @Subroutine(TealType.uint64)
-        def is_owner():
-            return Txn.sender() == App.globalGet(Bytes("owner"))   # owner is 32 bytes in length
         
-        @Subroutine(TealType.uint64)
-        def bootstrap():
-            cnt = ScratchVar(TealType.uint64)
-            return Seq([
-                App.globalPut(Bytes("owner"), Txn.application_args[0]),
-                Approve()
-            ])
+    def getContracts1(self, client: AlgodClient) -> Tuple[bytes, bytes]:
+        validUpdateHash = Bytes("validUpdateHash")
 
-        def setval():
-            return Seq([
-                Assert(is_owner()),
-                App.globalPut(Txn.application_args[1], Txn.application_args[2]),
-                Approve()
-            ])
-
-        def setkeys():
-            cnt = ScratchVar(TealType.uint64)
-            i = ScratchVar(TealType.uint64)
-            return Seq([
-                Assert(is_owner()),
-                cnt.store(Len(Txn.application_args[1]) / Int(65)),
-                Assert(cnt.load() > Int(0)),
-                App.globalPut(Bytes("cnt"), Itob(cnt.load())),
-                For(i.store(Int(0)), i.load() < cnt.load(), i.store(i.load() + Int(1))).Do(
-                        App.globalPut(Extract(Txn.application_args[1], i.load() * Int(65), Int(1)),
-                                      Extract(Txn.application_args[1], (i.load() * Int(65)) + Int(1), Int(64)))
-                ),
-                Approve()
-            ])
-
-        def approval_program():
-            handle_create = Return(bootstrap())
-            handle_update = Return(is_owner())
-            handle_delete = Return(is_owner())
-            METHOD = Txn.application_args[0]
-            handle_noop = Cond(
-                [METHOD == Bytes("setkeys"), setkeys()],
-                [METHOD == Bytes("setval"), setval()],
+        def approval_program(): 
+            on_create = Seq(
+                App.globalPut(validUpdateHash, Bytes("")),
+                Return(Int(1))
             )
 
-            return Cond(
-                [Txn.application_id() == Int(0), handle_create],
-                [Txn.on_completion() == OnComplete.UpdateApplication, handle_update],
-                [Txn.on_completion() == OnComplete.DeleteApplication, handle_delete],
-                [Txn.on_completion() == OnComplete.NoOp, handle_noop]
+            # In a real world case, this would also 
+            #   1) set the clear 
+            #   2) check some byzatine voting rules from the governance body to see if we should be allowed to 
+            #      update this hash
+            #   3) Remember the fact that we have executed this governance action so that we cannot replay it later
+
+            on_sethash = Seq(
+                App.globalPut(validUpdateHash, Txn.application_args[1]), 
+                Approve()
+            )
+            on_test = Seq(
+                Log(Bytes("test1")),
+                Approve()
             )
 
+            on_call_method = Txn.application_args[0]
+            on_call = Cond(
+                [on_call_method == Bytes("sethash"), on_sethash],
+                [on_call_method == Bytes("test"), on_test],
+            )
+
+            on_approve = Seq(
+                Approve(),
+            )
+
+            on_update = Seq(
+                Assert(Sha512_256(Concat(Bytes("Program"), Txn.approval_program())) == App.globalGet(validUpdateHash)),
+                Return(Int(1))
+            )
+
+            program = Cond(
+                [Txn.application_id() == Int(0), on_create],
+                [Txn.on_completion() == OnComplete.NoOp, on_call],
+                [Txn.on_completion() == OnComplete.DeleteApplication, on_approve],
+                [Txn.on_completion() == OnComplete.UpdateApplication, on_update],
+                [
+                    Or(
+                        Txn.on_completion() == OnComplete.OptIn,
+                        Txn.on_completion() == OnComplete.CloseOut,
+                    ),
+                    Reject(),
+                ],
+            )
+            return program
+    
         def clear_state_program():
-            return Int(1)
-
+            return Approve()
+    
         APPROVAL_PROGRAM = self.fullyCompileContract(client, approval_program())
         CLEAR_STATE_PROGRAM = self.fullyCompileContract(client, clear_state_program())
 
         return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
 
-    def getPrimaryContracts(self, client: AlgodClient) -> Tuple[bytes, bytes]:
-        @Subroutine(TealType.anytype)
-        def magic_load(key: TealType.bytes, default: Expr) -> Expr:
-            maybe = App.globalGetEx(Int(0), key)
-            return Seq(maybe, If(maybe.hasValue(), maybe.value(), default))
+    def getContracts2(self, client: AlgodClient) -> Tuple[bytes, bytes]:
+        validUpdateHash = Bytes("validUpdateHash")
 
-        def check_load(key: TealType.bytes) -> int:
-            maybe = App.globalGetEx(Int(0), key)
-            return Seq(maybe, If (maybe.hasValue(), Int(1), Int(0)))
-
-        def magic_store(key: TealType.bytes, val: any):
-            return Seq([App.globalPut(key, val)])
-
-        def duplicateSup(key: TealType.bytes):
-            maybe = App.globalGetEx(Int(0), key)
-            return Seq([
-                maybe,
-                If(maybe.hasValue()).Then(Reject()),
-                App.globalPut(key, Int(1))
-            ])
-
-        # emitter - Txn.application_args[1]
-        # seq - Txn.application_args[2]
-        # contract - Txn.application_args[3]
-        # chain - Txn.application_args[4]
-        # amount - Txn.application_args[5]
-
-        def redeemWrapped():
-            uid = ScratchVar()
-            asset = ScratchVar()
-            return Seq([
-                duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
-
-                uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
-                asset.store(magic_load(uid.load(), Int(0))),
-                If (asset.load() == Int(0)).Then(Reject()),
-                
-                InnerTxnBuilder.Begin(),
-                InnerTxnBuilder.SetFields(
-                    {
-                        TxnField.type_enum: TxnType.AssetTransfer,
-                        TxnField.xfer_asset: asset.load(),
-                        TxnField.asset_amount: Btoi(Txn.application_args[5]),
-                        TxnField.asset_receiver: Gtxn[0].sender(),
-                    }
-                ),
-                InnerTxnBuilder.Submit(),
-
-                Approve()
-            ])
-
-        def lookupAsset():
-            uid = ScratchVar()
-            asset = ScratchVar()
-            return Seq([
-                uid.store(Concat(Txn.application_args[1], Txn.application_args[2])),
-                asset.store(magic_load(uid.load(), Int(0))),
-                Log(Itob(asset.load())),
-                Approve()
-            ])
-
-        def addBuffer():
-            return Seq([
-                App.globalPut(Bytes("buffer"), Txn.application_args[1]),
-                Log(Txn.application_args[1]),
-                Approve()
-            ])
-
-        def setValue():
-            buf = ScratchVar()
-            return Seq([
-                buf.store(App.globalGet(Bytes("buffer"))),
-#                Log(buf.load()),
-                App.globalGetEx(Btoi(buf.load()), Bytes("a")),
-
-#                InnerTxnBuilder.Begin(),
-#                InnerTxnBuilder.SetFields(
-#                    {
-#                        TxnField.type_enum: TxnType.AssetTransfer,
-#                        TxnField.xfer_asset: asset.load(),
-#                        TxnField.asset_amount: Btoi(Txn.application_args[5]),
-#                        TxnField.asset_receiver: Gtxn[0].sender(),
-#                    }
-#                ),
-#                InnerTxnBuilder.Submit(),
-
-                
-                Log(Txn.application_args[1]),
-                Log(Txn.application_args[2]),
-                Approve()
-            ])
-
-        # emitter - Txn.application_args[1]
-        # seq - Txn.application_args[2]
-        # contract - Txn.application_args[3]
-        # chain - Txn.application_args[4]
-        # name - Txn.application_args[5]
-
-                
-        def createWrapped():
-            uid = ScratchVar()
-            mine = Global.current_application_address()
-        
-            return Seq([
-                duplicateSup(Concat(Txn.application_args[1], Txn.application_args[2])),
-
-                uid.store(Concat(Txn.application_args[3], Txn.application_args[4])),
-                If (magic_load(uid.load(), Int(0)) != Int(0)).Then(Approve()),
-        
-                InnerTxnBuilder.Begin(),
-                InnerTxnBuilder.SetFields(
-                    {
-                        TxnField.type_enum: TxnType.AssetConfig,
-                        TxnField.config_asset_name: Txn.application_args[5],
-                        TxnField.config_asset_unit_name: Txn.application_args[5],
-                        TxnField.config_asset_total: Int(int(1e10)),  # Is this needed?
-                        TxnField.config_asset_decimals: Int(8),
-                        TxnField.config_asset_manager: mine,
-                        TxnField.config_asset_reserve: mine,
-                        TxnField.config_asset_clawback: mine,
-                    }
-                ),
-                InnerTxnBuilder.Submit(),
-        
-                magic_store(uid.load(), InnerTxn.created_asset_id()),
-
-                Log(Itob(InnerTxn.created_asset_id())),
-        
-                Approve()
-            ])
-
-        @Subroutine(TealType.uint64)
-        def bootstrap():
-            return Seq([Approve()])
-        
-        @Subroutine(TealType.uint64)
-        def is_creator():
-            return Txn.sender() == Global.creator_address()
-        
-        def vaa_processor_program():
-            handle_create = Return(bootstrap())
-            handle_update = Return(is_creator())
-            handle_delete = Return(is_creator())
-            METHOD = Txn.application_args[0]
-            handle_noop = Cond(
-                [METHOD == Bytes("createWrapped"), createWrapped()],
-                [METHOD == Bytes("lookupAsset"), lookupAsset()],
-                [METHOD == Bytes("redeemWrapped"), redeemWrapped()],
-                [METHOD == Bytes("addBuffer"), addBuffer()],
-                [METHOD == Bytes("setValue"), setValue()],
+        def approval_program(): 
+            on_create = Seq(
+                App.globalPut(validUpdateHash, Bytes("")),
+                Return(Int(1))
             )
-            return Cond(
-                [Txn.application_id() == Int(0), handle_create],
-                [Txn.on_completion() == OnComplete.UpdateApplication, handle_update],
-                [Txn.on_completion() == OnComplete.DeleteApplication, handle_delete],
-                [Txn.on_completion() == OnComplete.NoOp, handle_noop]
+
+            on_sethash = Seq(
+                App.globalPut(validUpdateHash, Txn.application_args[1]), 
+                Approve()
             )
-        
-        def clear_state_program():
-            return Int(1)
+            on_test = Seq(
+                Log(Bytes("test2")),
+                Approve()
+            )
+
+            on_call_method = Txn.application_args[0]
+            on_call = Cond(
+                [on_call_method == Bytes("sethash"), on_sethash],
+                [on_call_method == Bytes("test"), on_test],
+            )
+
+            on_approve = Seq(
+                Approve(),
+            )
+
+            on_update = Seq(
+                Assert(Sha512_256(Concat(Bytes("Program"), Txn.approval_program())) == App.globalGet(validUpdateHash)),
+                Approve(),
+            )
+
+            program = Cond(
+                [Txn.application_id() == Int(0), on_create],
+                [Txn.on_completion() == OnComplete.NoOp, on_call],
+                [Txn.on_completion() == OnComplete.DeleteApplication, on_approve],
+                [Txn.on_completion() == OnComplete.UpdateApplication, on_update],
+                [
+                    Or(
+                        Txn.on_completion() == OnComplete.OptIn,
+                        Txn.on_completion() == OnComplete.CloseOut,
+                    ),
+                    Reject(),
+                ],
+            )
+            return program
     
-        APPROVAL_PROGRAM = self.fullyCompileContract(client, vaa_processor_program())
+        def clear_state_program():
+            return Approve()
+    
+        APPROVAL_PROGRAM = self.fullyCompileContract(client, approval_program())
         CLEAR_STATE_PROGRAM = self.fullyCompileContract(client, clear_state_program())
 
-#        with open("token_approval.teal", "w") as f:
-#            compiled = compileTeal(vaa_processor_program(), mode=Mode.Application, version=5)
-#            f.write(compiled)
-#
-#        with open("token_clear_state.teal", "w") as f:
-#            compiled = compileTeal(clear_state_program(), mode=Mode.Application, version=5)
-#            f.write(compiled)
-    
         return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
 
-    def createTokenApp(
+    def createTEST1App(
         self,
         client: AlgodClient,
         sender: Account,
     ) -> int:
-        approval, clear = self.getPrimaryContracts(client)
+        approval, clear = self.getContracts1(client)
     
-        globalSchema = transaction.StateSchema(num_uints=40, num_byte_slices=6)
+        globalSchema = transaction.StateSchema(num_uints=2, num_byte_slices=6)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=0)
     
         app_args = [ ]
@@ -475,8 +314,8 @@ class Token:
         txn = transaction.ApplicationCreateTxn(
             sender=sender.getAddress(),
             on_complete=transaction.OnComplete.NoOpOC,
-            approval_program=b64decode(approval["result"]),
-            clear_program=b64decode(clear["result"]),
+            approval_program=approval[0],
+            clear_program=clear[0],
             global_schema=globalSchema,
             local_schema=localSchema,
             app_args=app_args,
@@ -489,257 +328,98 @@ class Token:
     
         response = self.waitForTransaction(client, signedTxn.get_txid())
         assert response.applicationIndex is not None and response.applicationIndex > 0
-
-#        a = decode_address(get_application_address(response.applicationIndex))
-#        pprint.pprint((a, len(a)))
-#        sys.exit(0)
-
         return response.applicationIndex
 
-    def createDataApp(
+    def updateTEST1App(
         self,
         client: AlgodClient,
         sender: Account,
-        owner
+        appid: int
     ) -> int:
-        approval, clear = self.getDataContracts(client)
-    
-        globalSchema = transaction.StateSchema(num_uints=1, num_byte_slices=63)
-        localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=0)
-    
-        app_args = [ owner ]
-    
-        txn = transaction.ApplicationCreateTxn(
+        approval, clear = self.getContracts2(client)
+
+        # Lets see which program we are talking too
+        txn = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
+            index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            approval_program=b64decode(approval["result"]),
-            clear_program=b64decode(clear["result"]),
-            global_schema=globalSchema,
-            local_schema=localSchema,
-            app_args=app_args,
-            extra_pages=3,
+            app_args=[b"test"],
+            sp=client.suggested_params(),
+        )
+        signedTxn = txn.sign(sender.getPrivateKey())
+        client.send_transaction(signedTxn)
+        response = self.waitForTransaction(client, signedTxn.get_txid())
+        pprint.pprint(response.logs)
+
+        # This should fail...
+        txn = transaction.ApplicationUpdateTxn(
+            index=appid,
+            sender=sender.getAddress(),
+            approval_program=approval[0],
+            clear_program=clear[0],
+            app_args=[ ],
             sp=client.suggested_params(),
         )
     
         signedTxn = txn.sign(sender.getPrivateKey())
+        try:
+            client.send_transaction(signedTxn)
+            self.waitForTransaction(client, signedTxn.get_txid())
+            print("We did not fail as expected?!")
+        except Exception:
+            print("We failed as expected")
+
+        txn1 = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"sethash", approval[1]],
+            sp=client.suggested_params(),
+        )
+
+        txn2 = transaction.ApplicationUpdateTxn(
+            index=appid,
+            sender=sender.getAddress(),
+            approval_program=approval[0],
+            clear_program=clear[0],
+            app_args=[ ],
+            sp=client.suggested_params(),
+        )
+
+        transaction.assign_group_id([txn1, txn2])
     
+        signedTxn1 = txn1.sign(sender.getPrivateKey())
+        signedTxn2 = txn2.sign(sender.getPrivateKey())
+
+        client.send_transactions([signedTxn1, signedTxn2])
+        response = self.waitForTransaction(client, signedTxn2.get_txid())
+        pprint.pprint(response.__dict__)
+
+        # Lets see which program we are talking too
+        txn = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"test"],
+            sp=client.suggested_params(),
+        )
+        signedTxn = txn.sign(sender.getPrivateKey())
         client.send_transaction(signedTxn)
-    
         response = self.waitForTransaction(client, signedTxn.get_txid())
-        assert response.applicationIndex is not None and response.applicationIndex > 0
+        pprint.pprint(response.logs)
 
-        return response.applicationIndex
-
-    def addBuffer(self, client: AlgodClient, appID: int, bidder: Account, buf: int) -> None:
-        appAddr = get_application_address(appID)
-    
-        suggestedParams = client.suggested_params()
-    
-        appCallTxn = transaction.ApplicationCallTxn(
-            sender=bidder.getAddress(),
-            index=appID,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"addBuffer", buf],
-            sp=suggestedParams,
-        )
-
-        transaction.assign_group_id([appCallTxn])
-    
-        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
-    
-        client.send_transactions([signedAppCallTxn])
-    
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
-
-    def setValue(self, client: AlgodClient, appID: int, bidder: Account, key, val, dataID: int) -> None:
-        appAddr = get_application_address(appID)
-    
-        suggestedParams = client.suggested_params()
-    
-        appCallTxn = transaction.ApplicationCallTxn(
-            sender=bidder.getAddress(),
-            index=appID,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"setValue", key, val],
-            sp=suggestedParams,
-            foreign_apps = [dataID]
-        )
-
-        transaction.assign_group_id([appCallTxn])
-    
-        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
-    
-        client.send_transactions([signedAppCallTxn])
-    
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
-
-
-    def createWrapped(self, client: AlgodClient, appID: int, bidder: Account, bidAmount: int, coin: int) -> None:
-        appAddr = get_application_address(appID)
-    
-        suggestedParams = client.suggested_params()
-    
-        payTxn = transaction.PaymentTxn(
-            sender=bidder.getAddress(),
-            receiver=appAddr,
-            amt=bidAmount,
-            sp=suggestedParams,
-        )
-
-        appCallTxn = transaction.ApplicationCallTxn(
-            sender=bidder.getAddress(),
-            index=appID,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"createWrapped",
-                      self.emitter,
-                      self.seq,
-                      self.coins[coin]["contract"],
-                      1,
-                      self.coins[coin]["name"]
-                      ],
-            sp=suggestedParams,
-        )
-
-        self.seq = self.seq + 1
-
-        transaction.assign_group_id([payTxn, appCallTxn])
-    
-        signedPayTxn = payTxn.sign(bidder.getPrivateKey())
-        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
-    
-        client.send_transactions([signedPayTxn, signedAppCallTxn])
-    
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
-
-    def redeemWrapped(self, client: AlgodClient, appID: int, bidder: Account, coin: int, coins: int) -> None:
-        appAddr = get_application_address(appID)
-    
-        suggestedParams = client.suggested_params()
-
-        assetid = self.lookupAsset(client, appID, bidder, coin)
-
-        if (assetid == 0):
-            raise Exception('unknown asset')
-    
-        payTxn = transaction.PaymentTxn(
-            sender=bidder.getAddress(),
-            receiver=appAddr,
-            amt=1000,
-            sp=suggestedParams,
-        )
-
-        appCallTxn = transaction.ApplicationCallTxn(
-            sender=bidder.getAddress(),
-            index=appID,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"redeemWrapped",
-                      self.emitter,
-                      self.seq,
-                      self.coins[coin]["contract"],
-                      1,
-                      coins
-                      ],
-            foreign_assets = [ assetid ],
-            sp=suggestedParams,
-        )
-
-        self.seq = self.seq + 1
-
-        transaction.assign_group_id([payTxn, appCallTxn])
-    
-        signedPayTxn = payTxn.sign(bidder.getPrivateKey())
-        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
-    
-        client.send_transactions([signedPayTxn, signedAppCallTxn])
-    
-        pprint.pprint(self.waitForTransaction(client, appCallTxn.get_txid()).__dict__)
-
-    def lookupAsset(self, client: AlgodClient, appID: int, bidder: Account, coin: int) -> None:
-        appAddr = get_application_address(appID)
-    
-        suggestedParams = client.suggested_params()
-    
-        appCallTxn = transaction.ApplicationCallTxn(
-            sender=bidder.getAddress(),
-            index=appID,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"lookupAsset", self.coins[coin]["contract"], 1],
-            sp=suggestedParams,
-        )
-
-        transaction.assign_group_id([appCallTxn])
-    
-        signedAppCallTxn = appCallTxn.sign(bidder.getPrivateKey())
-    
-        client.send_transactions([signedAppCallTxn])
-    
-        txn = self.waitForTransaction(client, appCallTxn.get_txid()).__dict__
-        if "logs" not in txn:
-            return 0
-        if len(txn["logs"]) == 0:
-            return 0
-
-        return int.from_bytes(txn["logs"][0], byteorder='big')
-
-    def simple_token(self):
+    def simple_test1(self):
         client = self.getAlgodClient()
+        player1 = self.getTemporaryAccount(client)
 
-        print("Generating the foundation account...")
-        foundation = self.getTemporaryAccount(client)
-
-        print("Creating the Token app")
-        appID = self.createTokenApp(client=client, sender=foundation)
+        appID = self.createTEST1App(client=client, sender=player1)
         print("appID = " + str(appID))
 
-        player = self.getTemporaryAccount(client)
-
-        print("Creating the data")
-        dataID = self.createDataApp(client=client, sender=player, owner = decode_address(get_application_address(appID)))
-
-        print("addBuffer")
-        self.addBuffer(client, appID, player, dataID)
-
-        print("setValue")
-        self.setValue(client, appID, player, "a", "b", dataID)
-
-        print("printState")
-        pprint.pprint(client.account_info(foundation.getAddress()))
-        pprint.pprint(client.account_info(player.getAddress()))
-        sys.exit(0)
-
-        print("player assets")
-        pprint.pprint(self.getBalances(client, player.getAddress()))
-
         print("application state")
-        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+        pprint.pprint(self.read_state(client, player1.getAddress(), appID))
 
-        print("application assets")
-        pprint.pprint(self.getBalances(client, get_application_address(appID)))
+        self.updateTEST1App(client=client, sender=player1, appid=appID)
 
-        self.emitter = uuid.uuid4().hex
-        self.seq = 1
-        self.coins = []
-        for x in range(100):
-            self.coins.append({"contract": uuid.uuid4().hex, "name": "coin" + str(x)})
-
-        # In the real app, these createWrapped VAAs come as a
-        # cryptographically signed payload from the guardians and all
-        # the client is doing is submitting them.  For the purpose of
-        # this test, we are skipping that but pretend you normally
-        # cannot just be making up values
-
-        print("create wrapped coin 0")
-        self.createWrapped(client, appID, player, 201000, 0)
-
-#        print("create wrapped coin 1")
-#        self.createWrapped(client, appID, player, 101000, 1)
-#        print("create wrapped coin 2")
-#        self.createWrapped(client, appID, player, 101000, 2)
-
-        print("redeem coin 0")
-        self.redeemWrapped(client, appID, player, 0, 0)
-
-        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
-
-token = Token()
-token.simple_token()
+if __name__ == "__main__":
+    test1 = TEST1()
+    test1.simple_test1()
