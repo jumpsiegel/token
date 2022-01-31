@@ -13,6 +13,10 @@ import random
 import hashlib
 import uuid
 import sys
+import json
+import uvarint
+
+from local_blob import LocalBlob
 
 from algosdk.v2client.algod import AlgodClient
 from algosdk.kmd import KMDClient
@@ -23,7 +27,66 @@ from pyteal import compileTeal, Mode, Expr
 from pyteal import *
 from algosdk.logic import get_application_address
 
+from algosdk.future.transaction import LogicSigAccount
+
 import pprint
+
+class TmplSig:
+    """KeySig class reads in a json map containing assembly details of a template smart signature and allows you to populate it with the variables
+    In this case we are only interested in a single variable, the key which is a byte string to make the address unique.
+    In this demo we're using random strings but in practice you can choose something meaningful to your application
+    """
+
+    def __init__(self, name):
+        # Read the source map
+        with open("{}.json".format(name)) as f:
+            self.map = json.loads(f.read())
+
+        self.src = base64.b64decode(self.map["bytecode"])
+        self.sorted = dict(
+            sorted(
+                self.map["template_labels"].items(),
+                key=lambda item: item[1]["position"],
+            )
+        )
+
+    def populate(self, values: Dict[str, Union[str, int]]) -> LogicSigAccount:
+        """populate uses the map to fill in the variable of the bytecode and returns a logic sig with the populated bytecode"""
+        # Get the template source
+        contract = list(base64.b64decode(self.map["bytecode"]))
+
+        shift = 0
+        for k, v in self.sorted.items():
+            if k in values:
+                pos = v["position"] + shift
+                if v["bytes"]:
+                    val = bytes.fromhex(values[k])
+                    lbyte = uvarint.encode(len(val))
+                    # -1 to account for the existing 00 byte for length
+                    shift += (len(lbyte) - 1) + len(val)
+                    # +1 to overwrite the existing 00 byte for length
+                    contract[pos : pos + 1] = lbyte + val
+                else:
+                    val = uvarint.encode(values[k])
+                    # -1 to account for existing 00 byte
+                    shift += len(val) - 1
+                    # +1 to overwrite existing 00 byte
+                    contract[pos : pos + 1] = val
+
+        # Create a new LogicSigAccount given the populated bytecode
+        return LogicSigAccount(bytes(contract))
+
+    def get_bytecode_chunk(self, idx: int) -> Bytes:
+        start = 0
+        if idx > 0:
+            start = list(self.sorted.values())[idx - 1]["position"] + 1
+
+        stop = len(self.src)
+        if idx < len(self.sorted):
+            stop = list(self.sorted.values())[idx]["position"]
+
+        chunk = self.src[start:stop]
+        return Bytes(chunk)
 
 class Account:
     """Represents a private key and address for an Algorand account"""
@@ -74,6 +137,9 @@ class Token:
         self.KMD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.KMD_WALLET_NAME = "unencrypted-default-wallet"
         self.KMD_WALLET_PASSWORD = ""
+
+        self.seed_amt = int(1001000)  # The black magic in this number... 
+        self.cache = {}
 
         self.kmdAccounts : Optional[List[Account]] = None
 
@@ -226,26 +292,108 @@ class Token:
                 return app
         return {}
 
-    def getPrimaryContracts(self, client: AlgodClient) -> Tuple[bytes, bytes]:
-        def nop():
-            return Seq([Approve()])
-        
-        def init():
-            return Seq([
-                Assert(Txn.sender() == Global.creator_address()),
-                Log(Extract(Txn.application_args[1], Int(0), Int(10))),
-                Approve()
-            ])
+    def getPrimaryContracts(self, 
+                            client: AlgodClient,
+                            seed_amt: int = 0,
+                            tmpl_sig: TmplSig = None,
+                            ) -> Tuple[bytes, bytes]:
 
-        def vaa_processor_program():
+        def vaa_processor_program(seed_amt: int, tmpl_sig: TmplSig):
+            blob = LocalBlob()
+
+            @Subroutine(TealType.bytes)
+            def encode_uvarint(val: TealType.uint64, b: TealType.bytes):
+                buff = ScratchVar()
+                return Seq(
+                    buff.store(b),
+                    Concat(
+                        buff.load(),
+                        If(
+                            val >= Int(128),
+                            encode_uvarint(
+                                val >> Int(7),
+                                Extract(Itob((val & Int(255)) | Int(128)), Int(7), Int(1)),
+                            ),
+                            Extract(Itob(val & Int(255)), Int(7), Int(1)),
+                        ),
+                    ),
+                )
+    
+            @Subroutine(TealType.bytes)
+            def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
+                # We could iterate over N items and encode them for a more general interface
+                # but we inline them directly here
+        
+                return Sha512_256(
+                    Concat(
+                        Bytes("Program"),
+                        # ADDR_IDX aka sequence start
+                        tmpl_sig.get_bytecode_chunk(0),
+                        encode_uvarint(acct_seq_start, Bytes("")),
+                        # EMMITTER_ID
+                        tmpl_sig.get_bytecode_chunk(1),
+                        encode_uvarint(Len(emitter), Bytes("")),
+                        emitter,
+                        # SEED_AMT
+                        tmpl_sig.get_bytecode_chunk(2),
+                        encode_uvarint(Int(seed_amt), Bytes("")),
+                        # APP_ID
+                        tmpl_sig.get_bytecode_chunk(3),
+                        encode_uvarint(Global.current_application_id(), Bytes("")),
+                        tmpl_sig.get_bytecode_chunk(4),
+                    )
+                )
+        
+            @Subroutine(TealType.uint64)
+            def optin():
+                # Alias for readability
+                algo_seed = Gtxn[0]
+                optin = Gtxn[1]
+        
+                well_formed_optin = And(
+                    # Check that we're paying it
+                    algo_seed.type_enum() == TxnType.Payment,
+                    algo_seed.amount() == Int(seed_amt),
+                    # Check that its an opt in to us
+                    optin.type_enum() == TxnType.ApplicationCall,
+                    optin.on_completion() == OnComplete.OptIn,
+                    # Not strictly necessary since we wouldn't be seeing this unless it was us, but...
+                    optin.application_id() == Global.current_application_id(),
+                )
+        
+                return Seq(
+                    # Make sure its a valid optin
+                    Assert(well_formed_optin),
+                    # Init by writing to the full space available for the sender (Int(0))
+                    blob.zero(Int(0)),
+                    # we gucci
+                    Int(1)
+                )
+        
+            def nop():
+                return Seq([Approve()])
+            
+            def init():
+                return Seq([
+                    Assert(Txn.sender() == Global.creator_address()),
+                    # duplicate suppression
+                    Log(get_sig_address(Int(1), Global.creator_address())),
+                    #Assert(Txn.accounts[1] == get_sig_address(Int(1), Global.creator_address())),
+                    # guardian set
+                    #Assert(Txn.accounts[2] == get_sig_address(Int(2), Global.creator_address())),
+                    Log(Extract(Txn.application_args[1], Int(0), Int(10))),
+                    Approve()
+                ])
+
             METHOD = Txn.application_args[0]
 
             on_delete = Seq([Reject()])
 
-            handle_noop = Cond(
+            router = Cond(
                 [METHOD == Bytes("nop"), nop()],
                 [METHOD == Bytes("init"), init()],
             )
+
             on_create = Seq( [
                 App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
                 App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
@@ -258,32 +406,78 @@ class Token:
                 Return(Int(1))
             ] )
 
+            on_optin = Seq( [
+                Return(optin())
+            ])
+
             return Cond(
                 [Txn.application_id() == Int(0), on_create],
                 [Txn.on_completion() == OnComplete.UpdateApplication, on_update],
                 [Txn.on_completion() == OnComplete.DeleteApplication, on_delete],
-                [Txn.on_completion() == OnComplete.NoOp, handle_noop]
+#                [Txn.on_completion() == OnComplete.CloseOut, Int(0)],
+               [Txn.on_completion() == OnComplete.OptIn, on_optin],
+               [Txn.on_completion() == OnComplete.NoOp, router]
             )
         
         def clear_state_program():
             return Int(1)
     
-        APPROVAL_PROGRAM = self.fullyCompileContract(client, vaa_processor_program())
+        APPROVAL_PROGRAM = self.fullyCompileContract(client, vaa_processor_program(seed_amt, tmpl_sig))
         CLEAR_STATE_PROGRAM = self.fullyCompileContract(client, clear_state_program())
 
         return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
+
+
+    def get_sig_tmpl(self, **kwargs):
+        def sig_tmpl():
+            # We encode the app id as an 8 byte integer to ensure its a known size
+            # Otherwise the uvarint encoding may produce a different byte offset
+            # for the template variables
+            admin_app_id = Tmpl.Int("TMPL_APP_ID")
+            seed_amt = Tmpl.Int("TMPL_SEED_AMT")
+        
+            @Subroutine(TealType.uint64)
+            def init():
+                algo_seed = Gtxn[0]
+                optin = Gtxn[1]
+        
+                return And(
+                    Global.group_size() == Int(2),
+                    algo_seed.type_enum() == TxnType.Payment,
+                    algo_seed.amount() == seed_amt,
+                    algo_seed.rekey_to() == Global.zero_address(),
+                    algo_seed.close_remainder_to() == Global.zero_address(),
+                    optin.type_enum() == TxnType.ApplicationCall,
+                    optin.on_completion() == OnComplete.OptIn,
+                    optin.application_id() == admin_app_id,
+                    optin.rekey_to() == Global.zero_address(),
+                )
+        
+            return Seq(
+                # Just putting adding this as a tmpl var to make the address unique and deterministic
+                # We don't actually care what the value is, pop it
+                Pop(Tmpl.Int("TMPL_ADDR_IDX")),
+                Pop(Tmpl.Bytes("TMPL_EMITTER_ID")),
+                init(),
+            )
+        
+        # {"name":"sig.tmpl.teal","version":5,"source":"","bytecode":"BSABAYEASIAASIgAAUMyBIECEjMAECISEDMACIEAEhAzACAyAxIQMwAJMgMSEDMBEIEGEhAzARkiEhAzARiBABIQMwEgMgMSEIk=","template_labels":{"TMPL_ADDR_IDX":{"source_line":3,"position":5,"bytes":false},"TMPL_APP_ID":{"source_line":40,"position":63,"bytes":false},"TMPL_EMITTER_ID":{"source_line":5,"position":8,"bytes":true},"TMPL_SEED_AMT":{"source_line":20,"position":29,"bytes":false}},"label_map":{"init_0":9},"line_map":[0,1,4,6,7,9,10,13,0,0,0,14,16,18,19,22,23,24,25,28,30,31,32,35,37,38,39,42,44,45,46,49,51,52,53,56,57,58,59,62,64,65,66,69,71,72,73]}
+        return compileTeal(sig_tmpl(**kwargs), mode=Mode.Signature, version=5, assembleConstants=True)
 
     def createTokenApp(
         self,
         client: AlgodClient,
         sender: Account,
     ) -> int:
-        approval, clear = self.getPrimaryContracts(client)
+        # reads from sig.json
+        self.tsig = TmplSig("sig")
+
+        approval, clear = self.getPrimaryContracts(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
 
         pprint.pprint(clear)
     
         globalSchema = transaction.StateSchema(num_uints=40, num_byte_slices=6)
-        localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=0)
+        localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
         app_args = [ ]
     
@@ -307,7 +501,54 @@ class Token:
 
         return response.applicationIndex
 
+
+    def account_exists(self, client, app_id, addr):
+        try:
+            ai = client.account_info(addr)
+            pprint.pprint(ai)
+            if "apps-local-state" not in ai:
+                return False
+    
+            for app in ai["apps-local-state"]:
+                if app["id"] == app_id:
+                    return True
+        except:
+            print("Failed to find account {}".format(addr))
+        return False
+
+    def optin(self, client, sender, app_id, idx, emitter):
+        lsa = self.tsig.populate(
+            {
+                "TMPL_SEED_AMT": self.seed_amt,
+                "TMPL_APP_ID": app_id,
+                "TMPL_ADDR_IDX": idx,
+                "TMPL_EMITTER_ID": emitter,
+            }
+        )
+
+        sig_addr = lsa.address()
+
+        if sig_addr not in self.cache and not self.account_exists(client, app_id, sig_addr):
+            # Create it
+            sp = client.suggested_params()
+
+            seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt)
+            optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
+
+            transaction.assign_group_id([seed_txn, optin_txn])
+
+            signed_seed = seed_txn.sign(sender.getPrivateKey())
+            signed_optin = transaction.LogicSigTransaction(optin_txn, lsa)
+
+            client.send_transactions([signed_seed, signed_optin])
+            txn = self.waitForTransaction(client, signed_optin.get_txid()).__dict__
+            
+            self.cache[sig_addr] = True
+
     def bootGuardians(self, vaa, client, sender, appid):
+        self.optin(client, sender, appid, 1, "0004")
+        sys.exit(0)
+
         txn1 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=appid,
@@ -324,8 +565,6 @@ class Token:
         response = self.waitForTransaction(client, signedTxn1.get_txid())
         pprint.pprint(response.__dict__)
         
-        pass
-
     def simple_token(self):
         client = self.getAlgodClient()
 
