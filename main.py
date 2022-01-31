@@ -31,6 +31,14 @@ from algosdk.future.transaction import LogicSigAccount
 
 import pprint
 
+max_keys = 16
+max_bytes_per_key = 127
+bits_per_byte = 8
+
+bits_per_key = max_bytes_per_key * bits_per_byte
+max_bytes = max_bytes_per_key * max_keys
+max_bits = bits_per_byte * max_bytes
+
 class TmplSig:
     """KeySig class reads in a json map containing assembly details of a template smart signature and allows you to populate it with the variables
     In this case we are only interested in a single variable, the key which is a byte string to make the address unique.
@@ -87,6 +95,44 @@ class TmplSig:
 
         chunk = self.src[start:stop]
         return Bytes(chunk)
+
+    def sig_tmpl():
+        # We encode the app id as an 8 byte integer to ensure its a known size
+        # Otherwise the uvarint encoding may produce a different byte offset
+        # for the template variables
+        admin_app_id = Tmpl.Int("TMPL_APP_ID")
+        seed_amt = Tmpl.Int("TMPL_SEED_AMT")
+    
+        @Subroutine(TealType.uint64)
+        def init():
+            algo_seed = Gtxn[0]
+            optin = Gtxn[1]
+    
+            return And(
+                Global.group_size() == Int(2),
+                algo_seed.type_enum() == TxnType.Payment,
+                algo_seed.amount() == seed_amt,
+                algo_seed.rekey_to() == Global.zero_address(),
+                algo_seed.close_remainder_to() == Global.zero_address(),
+                optin.type_enum() == TxnType.ApplicationCall,
+                optin.on_completion() == OnComplete.OptIn,
+                optin.application_id() == admin_app_id,
+                optin.rekey_to() == Global.zero_address(),
+            )
+    
+        return Seq(
+            # Just putting adding this as a tmpl var to make the address unique and deterministic
+            # We don't actually care what the value is, pop it
+            Pop(Tmpl.Int("TMPL_ADDR_IDX")),
+            Pop(Tmpl.Bytes("TMPL_EMITTER_ID")),
+            init(),
+        )
+    
+    def get_sig_tmpl(**kwargs):
+        return compileTeal(
+            sig_tmpl(**kwargs), mode=Mode.Signature, version=5, assembleConstants=True
+        )
+
 
 class Account:
     """Represents a private key and address for an Algorand account"""
@@ -428,42 +474,6 @@ class Token:
         return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
 
 
-    def get_sig_tmpl(self, **kwargs):
-        def sig_tmpl():
-            # We encode the app id as an 8 byte integer to ensure its a known size
-            # Otherwise the uvarint encoding may produce a different byte offset
-            # for the template variables
-            admin_app_id = Tmpl.Int("TMPL_APP_ID")
-            seed_amt = Tmpl.Int("TMPL_SEED_AMT")
-        
-            @Subroutine(TealType.uint64)
-            def init():
-                algo_seed = Gtxn[0]
-                optin = Gtxn[1]
-        
-                return And(
-                    Global.group_size() == Int(2),
-                    algo_seed.type_enum() == TxnType.Payment,
-                    algo_seed.amount() == seed_amt,
-                    algo_seed.rekey_to() == Global.zero_address(),
-                    algo_seed.close_remainder_to() == Global.zero_address(),
-                    optin.type_enum() == TxnType.ApplicationCall,
-                    optin.on_completion() == OnComplete.OptIn,
-                    optin.application_id() == admin_app_id,
-                    optin.rekey_to() == Global.zero_address(),
-                )
-        
-            return Seq(
-                # Just putting adding this as a tmpl var to make the address unique and deterministic
-                # We don't actually care what the value is, pop it
-                Pop(Tmpl.Int("TMPL_ADDR_IDX")),
-                Pop(Tmpl.Bytes("TMPL_EMITTER_ID")),
-                init(),
-            )
-        
-        # {"name":"sig.tmpl.teal","version":5,"source":"","bytecode":"BSABAYEASIAASIgAAUMyBIECEjMAECISEDMACIEAEhAzACAyAxIQMwAJMgMSEDMBEIEGEhAzARkiEhAzARiBABIQMwEgMgMSEIk=","template_labels":{"TMPL_ADDR_IDX":{"source_line":3,"position":5,"bytes":false},"TMPL_APP_ID":{"source_line":40,"position":63,"bytes":false},"TMPL_EMITTER_ID":{"source_line":5,"position":8,"bytes":true},"TMPL_SEED_AMT":{"source_line":20,"position":29,"bytes":false}},"label_map":{"init_0":9},"line_map":[0,1,4,6,7,9,10,13,0,0,0,14,16,18,19,22,23,24,25,28,30,31,32,35,37,38,39,42,44,45,46,49,51,52,53,56,57,58,59,62,64,65,66,69,71,72,73]}
-        return compileTeal(sig_tmpl(**kwargs), mode=Mode.Signature, version=5, assembleConstants=True)
-
     def createTokenApp(
         self,
         client: AlgodClient,
@@ -501,7 +511,6 @@ class Token:
 
         return response.applicationIndex
 
-
     def account_exists(self, client, app_id, addr):
         try:
             ai = client.account_info(addr)
@@ -517,6 +526,8 @@ class Token:
         return False
 
     def optin(self, client, sender, app_id, idx, emitter):
+        print ((app_id, idx, emitter))
+
         lsa = self.tsig.populate(
             {
                 "TMPL_SEED_AMT": self.seed_amt,
@@ -545,15 +556,58 @@ class Token:
             
             self.cache[sig_addr] = True
 
+        return sig_addr
+
+    def parseVAA(self, vaa):
+        print (vaa.hex())
+        ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:4], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
+        for i in range(ret["siglen"]):
+            ret["sig" + str(i)] = vaa[(6 + (i * 66)):(6 + (i * 66)) + 66]
+        off = (ret["siglen"] * 66) + 6
+        ret["timestamp"] = int.from_bytes(vaa[off:(off + 4)], "big")
+        off += 4
+        ret["nonce"] = int.from_bytes(vaa[off:(off + 4)], "big")
+        off += 4
+        ret["chain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+        off += 2
+        ret["emitter"] = vaa[off:(off + 32)]
+        off += 32
+        ret["sequence"] = int.from_bytes(vaa[off:(off + 8)], "big")
+        off += 8
+        ret["consistency"] = int.from_bytes(vaa[off:(off + 1)], "big")
+        off += 1
+        ret["payload"] = vaa[off:].hex()
+
+        if vaa[off:(off + 32)].hex() == "00000000000000000000000000000000000000000000000000000000436f7265":
+            ret["module"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["action"] = int.from_bytes(vaa[off:(off + 1)], "big")
+            off += 1
+            ret["targetChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+            off += 2
+            ret["NewGuardianSetIndex"] = int.from_bytes(vaa[off:(off + 4)], "big")
+            off += 4
+        
+        return ret
+
     def bootGuardians(self, vaa, client, sender, appid):
-        self.optin(client, sender, appid, 1, "0004")
-        sys.exit(0)
+        p = self.parseVAA(vaa)
+        if "NewGuardianSetIndex" not in p:
+            raise Exception("invalid guardian VAA")
+        pprint.pprint(p)
+
+        seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        guardian_addr = self.optin(client, sender, appid, p["index"], b"guardian".hex())
+        newguardian_addr = self.optin(client, sender, appid, p["NewGuardianSetIndex"], b"guardian".hex())
+
+        print("opted in to everything")
 
         txn1 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"init", vaa],
+            accounts=[seq_addr, guardian_addr, newguardian_addr],
             sp=client.suggested_params(),
         )
 
@@ -565,6 +619,8 @@ class Token:
         response = self.waitForTransaction(client, signedTxn1.get_txid())
         pprint.pprint(response.__dict__)
         
+        sys.exit(0)
+
     def simple_token(self):
         client = self.getAlgodClient()
 
