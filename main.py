@@ -488,7 +488,7 @@ class Token:
                             # Send all the guardians over...
                             # How many signatures do we have?
                             len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
-                            #Pop(blob.write(Int(3), Int(0), Extract(Txn.application_args[1], off.load(), Int(1) + (Int(20) * len.load()))))
+                            Pop(blob.write(Int(3), Int(0), Extract(Txn.application_args[1], off.load(), Int(1) + (Int(20) * len.load()))))
                         ])]
                          ),
                     Approve()
