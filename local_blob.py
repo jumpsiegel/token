@@ -2,6 +2,7 @@ from typing import Tuple
 
 from pyteal import (
     App,
+    Assert,
     Bytes,
     BytesZero,
     Concat,

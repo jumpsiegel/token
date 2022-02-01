@@ -445,7 +445,7 @@ class Token:
                     blob.set_byte(Int(1), byte_offset.load(), SetBit(b.load(), sequence.load() % Int(8), Int(1)))
                 )
             
-            def init():
+            def hdlGovernance():
                 off = ScratchVar()
                 a = ScratchVar()
                 emitter = ScratchVar()
@@ -453,10 +453,6 @@ class Token:
                 len = ScratchVar()
 
                 return Seq([
-                    Assert(Txn.sender() == Global.creator_address()),
-                    # TODO:  Is this supposed to assert or just return silently?  Silently ignoring duplicates would be better for parallel relays...
-                    checkForDuplicate(),
-
                     off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
                     # Correct chain? 
                     Assert(Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0001")),
@@ -489,15 +485,21 @@ class Token:
                             # Lets see if the user handed us the correct memory
                             Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
                             off.store(off.load() + Int(4)),
+                            # Send all the guardians over...
                             # How many signatures do we have?
                             len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
-                            off.store(off.load() + Int(1)),
-                            Pop(blob.write(Int(3), Int(0), Itob(len.load()))),
-                            a.store(Extract(Txn.application_args[1], off.load(), Int(20) * len.load())),
-                            Pop(blob.write(Int(3), Int(1), a.load()))
+                            #Pop(blob.write(Int(3), Int(0), Extract(Txn.application_args[1], off.load(), Int(1) + (Int(20) * len.load()))))
                         ])]
                          ),
                     Approve()
+                ])
+
+            def init():
+                return Seq([
+                    Assert(Txn.sender() == Global.creator_address()),
+                    # TODO:  Is this supposed to assert or just return silently?  Silently ignoring duplicates would be better for parallel relays...
+                    checkForDuplicate(),
+                    hdlGovernance()
                 ])
 
             METHOD = Txn.application_args[0]
