@@ -482,11 +482,9 @@ class Token:
                             # move off to point at the NewGuardianSetIndex
                             off.store(off.load() + Int(3)),
                             idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
-                            # Lets see if the user handed us the correct memory
+                            # Lets see if the user handed us the correct memory... no hacky hacky
                             Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
                             off.store(off.load() + Int(4)),
-                            # Send all the guardians over...
-                            # How many signatures do we have?
                             len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
                             Pop(blob.write(Int(3), Int(0), Extract(Txn.application_args[1], off.load(), Int(1) + (Int(20) * len.load()))))
                         ])]
