@@ -418,16 +418,65 @@ class Token:
         
             def nop():
                 return Seq([Approve()])
+
+            @Subroutine(TealType.none)
+            def checkForDuplicate():
+                off = ScratchVar()
+                emitter = ScratchVar()
+                sequence = ScratchVar()
+                b = ScratchVar()
+                byte_offset = ScratchVar()
+
+                return Seq(
+                    off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
+                    emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
+                    sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
+                    byte_offset.store(sequence.load() / Int(max_bits)),
+                    # They passed us the correct account?
+                    Assert(Txn.accounts[1] == get_sig_address(byte_offset.load(), emitter.load())),
+                    # Now, lets go grab the raw byte
+                    b.store(blob.get_byte(Int(1), byte_offset.load())),
+
+                    # TODO
+                    # I would hope we've never seen this packet before...   throw an exception if we have?
+                    Assert(GetBit(b.load(), sequence.load() % Int(8)) == Int(0)),
+
+                    # Lets mark this bit so that we never see it again
+                    blob.set_byte(Int(1), byte_offset.load(), SetBit(b.load(), sequence.load() % Int(8), Int(1)))
+                )
             
             def init():
+                off = ScratchVar()
+                a = ScratchVar()
+                emitter = ScratchVar()
+                idx = ScratchVar()
+
                 return Seq([
                     Assert(Txn.sender() == Global.creator_address()),
-                    # duplicate suppression
-                    Log(get_sig_address(Int(1), Global.creator_address())),
-                    #Assert(Txn.accounts[1] == get_sig_address(Int(1), Global.creator_address())),
-                    # guardian set
-                    #Assert(Txn.accounts[2] == get_sig_address(Int(2), Global.creator_address())),
-                    Log(Extract(Txn.application_args[1], Int(0), Int(10))),
+                    checkForDuplicate(),
+
+                    off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
+                    # Correct chain? 
+                    Assert(Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0001")),
+                    # Correct emitter?
+                    Assert(Extract(Txn.application_args[1], off.load() + Int(2), Int(32)) == Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000004")),
+                    # Get us to the payload
+                    off.store(off.load() + Int(43)),
+                    # Is this a governance message?
+                    Assert(Extract(Txn.application_args[1], off.load(), Int(32)) == Bytes("base16", "00000000000000000000000000000000000000000000000000000000436f7265")),
+                    off.store(off.load() + Int(32)),
+                    a.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+                    Cond( [a.load() == Int(2), Seq([
+                        # We are updating the guardian set
+                        # TODO: Should these be pointed at all chains?
+                        Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0000")),
+                        # move off to point at the NewGuardianSetIndex
+                        off.store(off.load() + Int(3)),
+                        idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
+                        # Lets see if the user handed us the correct memory
+                        Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))),
+                        ])]
+                         ),
                     Approve()
                 ])
 
@@ -602,6 +651,18 @@ class Token:
 
         print("opted in to everything")
 
+        # wormhole is not a cheap protocol... we need to buy ourselves
+        # some extra CPU cycles by having an early txn do nothing.
+        # This leaves cycles over for later txn's in the same group
+
+        txn0 = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"nop"],
+            sp=client.suggested_params(),
+        )
+
         txn1 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=appid,
@@ -611,11 +672,12 @@ class Token:
             sp=client.suggested_params(),
         )
 
-        transaction.assign_group_id([txn1])
+        transaction.assign_group_id([txn0, txn1])
     
+        signedTxn0 = txn0.sign(sender.getPrivateKey())
         signedTxn1 = txn1.sign(sender.getPrivateKey())
 
-        client.send_transactions([signedTxn1])
+        client.send_transactions([signedTxn0, signedTxn1])
         response = self.waitForTransaction(client, signedTxn1.get_txid())
         pprint.pprint(response.__dict__)
         
