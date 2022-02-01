@@ -450,9 +450,11 @@ class Token:
                 a = ScratchVar()
                 emitter = ScratchVar()
                 idx = ScratchVar()
+                len = ScratchVar()
 
                 return Seq([
                     Assert(Txn.sender() == Global.creator_address()),
+                    # TODO:  Is this supposed to assert or just return silently?  Silently ignoring duplicates would be better for parallel relays...
                     checkForDuplicate(),
 
                     off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
@@ -466,15 +468,32 @@ class Token:
                     Assert(Extract(Txn.application_args[1], off.load(), Int(32)) == Bytes("base16", "00000000000000000000000000000000000000000000000000000000436f7265")),
                     off.store(off.load() + Int(32)),
                     a.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
-                    Cond( [a.load() == Int(2), Seq([
-                        # We are updating the guardian set
-                        # TODO: Should these be pointed at all chains?
-                        Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0000")),
-                        # move off to point at the NewGuardianSetIndex
-                        off.store(off.load() + Int(3)),
-                        idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
-                        # Lets see if the user handed us the correct memory
-                        Assert(Txn.accounts[3] != get_sig_address(idx.load(), Bytes("guardian"))),
+                    Cond( 
+                        [a.load() == Int(1), Seq([
+                            # ContractUpgrade is a VAA that instructs an implementation on a specific chain to upgrade itself
+                            # 
+                            # In the case of Algorand, it contains the hash of the program that we are allowed to upgrade ourselves to.  We would then run the upgrade program itself
+                            # to perform the actual upgrade
+                            Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0008")),
+                            off.store(off.load() + Int(3)),
+                            App.globalPut(Bytes("validUpdateApproveHash"), Extract(Txn.application_args[1], off.load(), Int(32)))
+                        ])],
+                        [a.load() == Int(2), Seq([
+                            # We are updating the guardian set
+
+                            # TODO: Should these be pointed at all chains or could this just be us?
+                            Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0000")),
+                            # move off to point at the NewGuardianSetIndex
+                            off.store(off.load() + Int(3)),
+                            idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
+                            # Lets see if the user handed us the correct memory
+                            Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
+                            off.store(off.load() + Int(4)),
+                            # How many signatures do we have?
+                            len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+                            off.store(off.load() + Int(1)),
+                            Pop(blob.write(Int(3), Int(0), Itob(len.load()))),
+                            Pop(blob.write(Int(3), Int(1), Extract(Txn.application_args[1], off.load(), Int(20) * len.load()))),
                         ])]
                          ),
                     Approve()
@@ -659,11 +678,19 @@ class Token:
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"nop"],
+            app_args=[b"nop", b"0"],
             sp=client.suggested_params(),
         )
 
         txn1 = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"nop", b"1"],
+            sp=client.suggested_params(),
+        )
+
+        txn2 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
@@ -672,13 +699,14 @@ class Token:
             sp=client.suggested_params(),
         )
 
-        transaction.assign_group_id([txn0, txn1])
+        transaction.assign_group_id([txn0, txn1, txn2])
     
         signedTxn0 = txn0.sign(sender.getPrivateKey())
         signedTxn1 = txn1.sign(sender.getPrivateKey())
+        signedTxn2 = txn2.sign(sender.getPrivateKey())
 
-        client.send_transactions([signedTxn0, signedTxn1])
-        response = self.waitForTransaction(client, signedTxn1.get_txid())
+        client.send_transactions([signedTxn0, signedTxn1, signedTxn2])
+        response = self.waitForTransaction(client, signedTxn2.get_txid())
         pprint.pprint(response.__dict__)
         
         sys.exit(0)
