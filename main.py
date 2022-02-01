@@ -493,7 +493,8 @@ class Token:
                             len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
                             off.store(off.load() + Int(1)),
                             Pop(blob.write(Int(3), Int(0), Itob(len.load()))),
-                            Pop(blob.write(Int(3), Int(1), Extract(Txn.application_args[1], off.load(), Int(20) * len.load()))),
+                            a.store(Extract(Txn.application_args[1], off.load(), Int(20) * len.load())),
+                            Pop(blob.write(Int(3), Int(1), a.load()))
                         ])]
                          ),
                     Approve()
