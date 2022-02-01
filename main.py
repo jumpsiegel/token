@@ -474,7 +474,7 @@ class Token:
                         off.store(off.load() + Int(3)),
                         idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
                         # Lets see if the user handed us the correct memory
-                        Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))),
+                        Assert(Txn.accounts[3] != get_sig_address(idx.load(), Bytes("guardian"))),
                         ])]
                          ),
                     Approve()
