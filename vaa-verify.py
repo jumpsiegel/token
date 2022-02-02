@@ -5,8 +5,11 @@
 The VAA Signature Verify Stateless Program
 
 Copyright 2022 Wormhole Project Contributors
+
 Licensed under the Apache License, Version 2.0 (the "License");
+
 you may not use this file except in compliance with the License.
+
 You may obtain a copy of the License at
 http://www.apache.org/licenses/LICENSE-2.0
 Unless required by applicable law or agreed to in writing, software
@@ -20,7 +23,7 @@ limitations under the License.
 This program verifies a subset of the signatures in a VAA against the guardian set. This
 program works in tandem with the VAA Processor stateful program.
 
-The difference between this version and the Randlabs version is we removed most of the asserts
+The difference between this version and the Randlabs version is I removed most of the asserts
 since we are going to have to completely validate the arguments again in the
 TokenBridge contract.
 
