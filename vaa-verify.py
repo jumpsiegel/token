@@ -20,8 +20,6 @@ limitations under the License.
 This program verifies a subset of the signatures in a VAA against the guardian set. This
 program works in tandem with the VAA Processor stateful program.
 
-----
-
 The difference between this version and the Randlabs version is we removed most of the asserts
 since we are going to have to completely validate the arguments again in the
 TokenBridge contract.
@@ -100,7 +98,6 @@ def vaa_verify_program():
     keys = Txn.application_args[2]
 
     return Seq([
-        Assert(Txn.application_args.length() == Int(3)),
         Assert(Txn.rekey_to() == Global.zero_address()),
         Assert(Txn.type_enum() == TxnType.ApplicationCall),
         Assert(sig_check(signatures, digest, keys)),
