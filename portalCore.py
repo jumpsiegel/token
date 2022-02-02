@@ -176,16 +176,19 @@ def getCoreContracts(   client: AlgodClient,
                     [a.load() == Int(2), Seq([
                         # We are updating the guardian set
 
-                        # TODO: Should these be pointed at all chains or could this just be us?
+                        # This should point at all chains
                         Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0000")),
-                        # move off to point at the NewGuardianSetIndex
+
+                        # move off to point at the NewGuardianSetIndex and grab it
                         off.store(off.load() + Int(3)),
                         idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
+
                         # Lets see if the user handed us the correct memory... no hacky hacky
                         Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
+
+                        # Write everything out to the auxilliary storage
                         off.store(off.load() + Int(4)),
                         len.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
-                        # Write everything out to the auxilliary storage
                         Pop(blob.write(Int(3), Int(0), Extract(Txn.application_args[1], off.load(), Int(1) + (Int(20) * len.load()))))
                     ])]
                      ),
@@ -194,9 +197,15 @@ def getCoreContracts(   client: AlgodClient,
 
         def init():
             return Seq([
+                # You own it, you better never let it go
                 Assert(Txn.sender() == Global.creator_address()),
-                # TODO:  Is this supposed to assert or just return silently?  Silently ignoring duplicates would be better for parallel relays...
-                checkForDuplicate(),
+
+                # You only get one shot, do not miss your chance to blow
+                # This opportunity comes once in a lifetime
+                Assert(App.globalGet(Bytes("booted")) != Bytes("true")),
+                App.globalPut(Bytes("booted"), Bytes("true")),
+
+                # yo
                 hdlGovernance()
             ])
 
@@ -210,6 +219,7 @@ def getCoreContracts(   client: AlgodClient,
         )
 
         on_create = Seq( [
+            App.globalPut(Bytes("booted"), Bytes("false")),
             App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
             App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
             Return(Int(1))
