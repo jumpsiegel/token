@@ -4,9 +4,16 @@
 
 The VAA Signature Verify Stateless Program
 
-(c) 2021 Randlabs, Inc.
-
-Modified by Jump Crypto...
+Copyright 2022 Wormhole Project Contributors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ------------------------------------------------------------------------------------------------
 
@@ -17,14 +24,11 @@ program works in tandem with the VAA Processor stateful program.
 
 The difference between this version and the Randlabs version is we removed most of the asserts
 since we are going to have to completely validate the arguments again in the
-TokenBridge contract.  Lets keep this simple and flexible and just
-have it do the signature verifications we ask it to.
+TokenBridge contract.
 
 We also cannot retroactively see/verify what arguments were passed into this
 function unless all the arguments are in the Txn.application_args so
 everything has to get moved out of the lsig args and into the txn_args
-
------
 
 ================================================================================================
 
@@ -85,8 +89,6 @@ def sig_check(signatures, digest, keys):
                                     rec_pk_y.load())), Int(12), Int(32))
                         )
                     ])
-
-
             ),
             Return(Int(1))
         ]
@@ -96,10 +98,9 @@ def vaa_verify_program():
     digest = Txn.note()
     signatures = Txn.application_args[1]
     keys = Txn.application_args[2]
-    num_guardians = Txn.application_args[3]
 
     return Seq([
-        Assert(Txn.application_args.length() == Int(4)),
+        Assert(Txn.application_args.length() == Int(3)),
         Assert(Txn.rekey_to() == Global.zero_address()),
         Assert(Txn.type_enum() == TxnType.ApplicationCall),
         Assert(sig_check(signatures, digest, keys)),
