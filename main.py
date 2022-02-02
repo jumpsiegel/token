@@ -140,7 +140,7 @@ class Account:
     def __init__(self, privateKey: str) -> None:
         self.sk = privateKey
         self.addr = account.address_from_private_key(privateKey)
-        print (privateKey + " -> " + self.getMnemonic())
+        #print (privateKey + " -> " + self.getMnemonic())
 
     def getAddress(self) -> str:
         return self.addr
@@ -173,7 +173,7 @@ class PendingTxnResponse:
         self.innerTxns: List[Any] = response.get("inner-txns", [])
         self.logs: List[bytes] = [b64decode(l) for l in response.get("logs", [])]
 
-class Token:
+class PortalCore:
     def __init__(self) -> None:
         self.ALGOD_ADDRESS = "http://localhost:4001"
         self.ALGOD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -543,7 +543,7 @@ class Token:
         return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
 
 
-    def createTokenApp(
+    def createPortalCoreApp(
         self,
         client: AlgodClient,
         sender: Account,
@@ -553,8 +553,6 @@ class Token:
 
         approval, clear = self.getPrimaryContracts(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
 
-        pprint.pprint(clear)
-    
         globalSchema = transaction.StateSchema(num_uints=40, num_byte_slices=6)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
@@ -583,7 +581,6 @@ class Token:
     def account_exists(self, client, app_id, addr):
         try:
             ai = client.account_info(addr)
-            pprint.pprint(ai)
             if "apps-local-state" not in ai:
                 return False
     
@@ -594,9 +591,7 @@ class Token:
             print("Failed to find account {}".format(addr))
         return False
 
-    def optin(self, client, sender, app_id, idx, emitter):
-        print ((app_id, idx, emitter))
-
+    def optin(self, client, sender, app_id, idx, emitter, doCreate=True):
         lsa = self.tsig.populate(
             {
                 "TMPL_SEED_AMT": self.seed_amt,
@@ -609,26 +604,27 @@ class Token:
         sig_addr = lsa.address()
 
         if sig_addr not in self.cache and not self.account_exists(client, app_id, sig_addr):
-            # Create it
-            sp = client.suggested_params()
-
-            seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt)
-            optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
-
-            transaction.assign_group_id([seed_txn, optin_txn])
-
-            signed_seed = seed_txn.sign(sender.getPrivateKey())
-            signed_optin = transaction.LogicSigTransaction(optin_txn, lsa)
-
-            client.send_transactions([signed_seed, signed_optin])
-            txn = self.waitForTransaction(client, signed_optin.get_txid()).__dict__
-            
-            self.cache[sig_addr] = True
+            if doCreate:
+                # Create it
+                sp = client.suggested_params()
+    
+                seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt)
+                optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
+    
+                transaction.assign_group_id([seed_txn, optin_txn])
+    
+                signed_seed = seed_txn.sign(sender.getPrivateKey())
+                signed_optin = transaction.LogicSigTransaction(optin_txn, lsa)
+    
+                client.send_transactions([signed_seed, signed_optin])
+                txn = self.waitForTransaction(client, signed_optin.get_txid()).__dict__
+                
+                self.cache[sig_addr] = True
 
         return sig_addr
 
     def parseVAA(self, vaa):
-        print (vaa.hex())
+#        print (vaa.hex())
         ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:4], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
         for i in range(ret["siglen"]):
             ret["sig" + str(i)] = vaa[(6 + (i * 66)):(6 + (i * 66)) + 66]
@@ -663,13 +659,10 @@ class Token:
         p = self.parseVAA(vaa)
         if "NewGuardianSetIndex" not in p:
             raise Exception("invalid guardian VAA")
-        pprint.pprint(p)
 
         seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["emitter"].hex())
         guardian_addr = self.optin(client, sender, appid, p["index"], b"guardian".hex())
         newguardian_addr = self.optin(client, sender, appid, p["NewGuardianSetIndex"], b"guardian".hex())
-
-        print("opted in to everything")
 
         # wormhole is not a cheap protocol... we need to buy ourselves
         # some extra CPU cycles by having an early txn do nothing.
@@ -708,28 +701,54 @@ class Token:
 
         client.send_transactions([signedTxn0, signedTxn1, signedTxn2])
         response = self.waitForTransaction(client, signedTxn2.get_txid())
-        pprint.pprint(response.__dict__)
-        
-        sys.exit(0)
+        #pprint.pprint(response.__dict__)
 
-    def simple_token(self):
+
+    def lookupGuardians(self, client, sender, appid, index):
+        newguardian_addr = self.optin(client, sender, appid, index, b"guardian".hex(), False)
+
+        app_state = None
+        ai = client.account_info(newguardian_addr)
+        for app in ai["apps-local-state"]:
+            if app["id"] == appid:
+                app_state = app["key-value"]
+
+        if None != app_state:
+            vals = {}
+            e = "00"*127
+            for kv in app_state:
+                key = int.from_bytes(base64.b64decode(kv["key"]), "big")
+                v = base64.b64decode(kv["value"]["bytes"]).hex()
+                if v != e:
+                    vals[key] = v
+            ret = ""
+            for k in sorted(vals.keys()):
+                ret = ret + vals[k]
+            return ret
+        else:
+            return "00"
+        
+    def simple_core(self):
         client = self.getAlgodClient()
 
         print("Generating the foundation account...")
         foundation = self.getTemporaryAccount(client)
 
-        print("Creating the Token app")
-        appID = self.createTokenApp(client=client, sender=foundation)
+        print("Creating the PortalCore app")
+        appID = self.createPortalCoreApp(client=client, sender=foundation)
         print("appID = " + str(appID))
 
-        # This sets the guardians
+        print("bootstrapping the guardian set...")
         bootVAA = bytes.fromhex(open("boot.vaa", "r").read())
-
         self.bootGuardians(bootVAA, client, foundation, appID)
 
         player = self.getTemporaryAccount(client)
 
-        pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+        print("upgrading the the guardian set...")
 
-token = Token()
-token.simple_token()
+        #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
+
+        #pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+
+core = PortalCore()
+core.simple_core()
