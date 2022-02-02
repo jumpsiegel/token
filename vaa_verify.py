@@ -108,3 +108,6 @@ def vaa_verify_program():
         Assert(sig_check(signatures, digest, keys)),
         Approve()]
     )
+
+def get_vaa_verify():
+    return compileTeal(vaa_verify_program(), mode=Mode.Signature, version=5)

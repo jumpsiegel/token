@@ -201,9 +201,11 @@ def getCoreContracts(   client: AlgodClient,
                 Assert(Txn.sender() == Global.creator_address()),
 
                 # You only get one shot, do not miss your chance to blow
-                # This opportunity comes once in a lifetime
                 Assert(App.globalGet(Bytes("booted")) != Bytes("true")),
                 App.globalPut(Bytes("booted"), Bytes("true")),
+
+                # This opportunity comes once in a lifetime
+                App.globalPut(Bytes("vphash"), Txn.application_args[2]),
 
                 # yo
                 hdlGovernance()
@@ -220,6 +222,7 @@ def getCoreContracts(   client: AlgodClient,
 
         on_create = Seq( [
             App.globalPut(Bytes("booted"), Bytes("false")),
+            App.globalPut(Bytes("vphash"), Bytes("")),
             App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
             App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
             Return(Int(1))

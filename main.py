@@ -28,6 +28,7 @@ from algosdk.future import transaction
 from pyteal import compileTeal, Mode, Expr
 from pyteal import *
 from algosdk.logic import get_application_address
+from vaa_verify import get_vaa_verify
 
 from algosdk.future.transaction import LogicSigAccount
 
@@ -327,10 +328,12 @@ class PortalCore:
 
     def parseVAA(self, vaa):
 #        print (vaa.hex())
-        ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:4], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
+        ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:5], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
+        ret["sigs"] = []
         for i in range(ret["siglen"]):
-            ret["sig" + str(i)] = vaa[(6 + (i * 66)):(6 + (i * 66)) + 66]
+            ret["sigs"].append(vaa[(6 + (i * 66)):(6 + (i * 66)) + 66].hex())
         off = (ret["siglen"] * 66) + 6
+        ret["payload"] = vaa[off:].hex()  # This is what is actually signed...
         ret["timestamp"] = int.from_bytes(vaa[off:(off + 4)], "big")
         off += 4
         ret["nonce"] = int.from_bytes(vaa[off:(off + 4)], "big")
@@ -343,7 +346,6 @@ class PortalCore:
         off += 8
         ret["consistency"] = int.from_bytes(vaa[off:(off + 1)], "big")
         off += 1
-        ret["payload"] = vaa[off:].hex()
 
         if vaa[off:(off + 32)].hex() == "00000000000000000000000000000000000000000000000000000000436f7265":
             ret["module"] = vaa[off:(off + 32)].hex()
@@ -390,7 +392,7 @@ class PortalCore:
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"init", vaa],
+            app_args=[b"init", vaa, self.vaa_verify["hash"]],
             accounts=[seq_addr, guardian_addr, newguardian_addr],
             sp=client.suggested_params(),
         )
@@ -429,9 +431,16 @@ class PortalCore:
             return ret
         else:
             return "00"
+
+    def submitVAA(self, vaa, client, sender, appid):
+        p = self.parseVAA(vaa)
+        pprint.pprint(p)
         
     def simple_core(self):
         client = self.getAlgodClient()
+
+        print("building our stateless vaa_verify...")
+        self.vaa_verify = client.compile(get_vaa_verify())
 
         print("Generating the foundation account...")
         foundation = self.getTemporaryAccount(client)
@@ -447,9 +456,10 @@ class PortalCore:
         print("grabbing a untrusted account")
         player = self.getTemporaryAccount(client)
 
-        print("upgrading the the guardian set...")
+        print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(open("boot2.vaa", "r").read())
-#        self.submitVAA(upgradeVAA, client, player, appID)
+
+        self.submitVAA(upgradeVAA, client, player, appID)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
