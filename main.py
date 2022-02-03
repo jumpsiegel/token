@@ -320,7 +320,7 @@ class PortalCore:
                 signed_optin = transaction.LogicSigTransaction(optin_txn, lsa)
     
                 client.send_transactions([signed_seed, signed_optin])
-                txn = self.waitForTransaction(client, signed_optin.get_txid()).__dict__
+                self.waitForTransaction(client, signed_optin.get_txid())
                 
                 self.cache[sig_addr] = True
 
@@ -329,11 +329,12 @@ class PortalCore:
     def parseVAA(self, vaa):
 #        print (vaa.hex())
         ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:5], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
+        ret["signatures"] = vaa[6:(ret["siglen"] * 66) + 6]
         ret["sigs"] = []
         for i in range(ret["siglen"]):
             ret["sigs"].append(vaa[(6 + (i * 66)):(6 + (i * 66)) + 66].hex())
         off = (ret["siglen"] * 66) + 6
-        ret["payload"] = vaa[off:].hex()  # This is what is actually signed...
+        ret["digest"] = vaa[off:].hex()  # This is what is actually signed...
         ret["timestamp"] = int.from_bytes(vaa[off:(off + 4)], "big")
         off += 4
         ret["nonce"] = int.from_bytes(vaa[off:(off + 4)], "big")
@@ -417,30 +418,116 @@ class PortalCore:
             if app["id"] == appid:
                 app_state = app["key-value"]
 
+        ret = b''
         if None != app_state:
             vals = {}
-            e = "00"*127
+            e = bytes.fromhex("00"*127)
             for kv in app_state:
                 key = int.from_bytes(base64.b64decode(kv["key"]), "big")
-                v = base64.b64decode(kv["value"]["bytes"]).hex()
+                v = base64.b64decode(kv["value"]["bytes"])
                 if v != e:
                     vals[key] = v
-            ret = ""
             for k in sorted(vals.keys()):
                 ret = ret + vals[k]
-            return ret
-        else:
-            return "00"
+        return ret
+
+    # There is no client side duplicate suppression or validity
+    # checking since we need to be able to detect all failure cases in
+    # the contract itself and we want to use this to drive the test
+    # cases
 
     def submitVAA(self, vaa, client, sender, appid):
         p = self.parseVAA(vaa)
-        pprint.pprint(p)
-        
+
+        # First we need to opt into the sequence number 
+        seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        # And then the signatures to help us verify the vaa_s
+        guardian_addr = self.optin(client, sender, appid, p["index"], b"guardian".hex())
+
+        accts = [seq_addr, guardian_addr]
+
+        # If this happens to be setting up a new guardian set, we probably need it as well...
+        if "NewGuardianSetIndex" in p:
+            newguardian_addr = self.optin(client, sender, appid, p["NewGuardianSetIndex"], b"guardian".hex())
+            accts.append(newguardian_addr)
+
+        keys = self.lookupGuardians(client, sender, appid, p["index"])
+
+        sp = client.suggested_params()
+
+        txns = []
+
+        # How many signatures can we process in a single pass
+        bsize = (7*66)
+        blocks = int(len(p["signatures"]) / bsize) + 1
+
+        bal = self.getBalances(client, self.vaa_verify["hash"])
+        des = 200000 + 1000 * blocks
+
+        if (bal[0] < des):
+            txns.append(
+                transaction.PaymentTxn(
+                    sender = sender.getAddress(), 
+                    sp = sp, 
+                    receiver = self.vaa_verify["hash"], 
+                    amt = des - bal[0]
+                )
+            )
+
+        for i in range(blocks):
+            # Which signatures will we be verifying in this block
+            b = p["signatures"][(i * bsize):]
+            if (len(b) > bsize):
+                b = b[:bsize]
+            # keys
+            k = b''
+            # Grab the key associated the signature
+            for q in range(int(len(b) / 66)):
+                # Which guardian is this signature associated with
+                g = b[q * 66]
+                key = keys[((g * 20) + 1) : (((g + 1) * 20) + 1)]
+                k = k + key
+
+            txns.append(transaction.ApplicationCallTxn(
+                    sender=sender.getAddress(),
+                    index=appid,
+                    on_complete=transaction.OnComplete.NoOpOC,
+                    app_args=[b"verifySigs", b, k],
+                    accounts=accts,
+                    note = p["digest"],
+                    sp=sp
+                ))
+
+        txns.append(transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"verifyVAA", vaa],
+            accounts=accts,
+            note = p["digest"],
+            sp=sp
+        ))
+
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            if ("app_args" in t.__dict__ and len(t.app_args) > 0 and t.app_args[0] == b"verifySigs"):
+                grp.append(transaction.LogicSigTransaction(t, self.vaa_verify["lsa"]))
+            else:
+                grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        response = self.waitForTransaction(client, grp[-1].get_txid())
+        pprint.pprint(response.__dict__)
+
     def simple_core(self):
         client = self.getAlgodClient()
 
         print("building our stateless vaa_verify...")
         self.vaa_verify = client.compile(get_vaa_verify())
+        self.vaa_verify["lsa"] = LogicSigAccount(base64.b64decode(self.vaa_verify["result"]))
 
         print("Generating the foundation account...")
         foundation = self.getTemporaryAccount(client)

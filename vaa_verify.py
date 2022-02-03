@@ -86,11 +86,7 @@ def sig_check(signatures, digest, keys):
 
                         # Generate Ethereum-type public key, compare with guardian key.
 
-                        Assert(
-                            Extract(keys, ki.load(), Int(20)) ==
-                            Substring(Keccak256(Concat(rec_pk_x.load(),
-                                    rec_pk_y.load())), Int(12), Int(32))
-                        )
+#                        Assert(Extract(keys, ki.load(), Int(20)) == Substring(Keccak256(Concat(rec_pk_x.load(), rec_pk_y.load())), Int(12), Int(32)))
                     ])
             ),
             Return(Int(1))
