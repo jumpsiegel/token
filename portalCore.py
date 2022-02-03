@@ -211,6 +211,16 @@ def getCoreContracts(   client: AlgodClient,
                 hdlGovernance()
             ])
 
+        def verifySigs():
+            return Seq([
+                Approve(),
+            ])
+
+        def verifyVAA():
+            return Seq([
+                Approve(),
+            ])
+
         METHOD = Txn.application_args[0]
 
         on_delete = Seq([Reject()])
@@ -218,6 +228,8 @@ def getCoreContracts(   client: AlgodClient,
         router = Cond(
             [METHOD == Bytes("nop"), nop()],
             [METHOD == Bytes("init"), init()],
+            [METHOD == Bytes("verifySigs"), verifySigs()],
+            [METHOD == Bytes("verifyVAA"), verifyVAA()],
         )
 
         on_create = Seq( [

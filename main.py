@@ -30,7 +30,7 @@ from pyteal import *
 from algosdk.logic import get_application_address
 from vaa_verify import get_vaa_verify
 
-from algosdk.future.transaction import LogicSigAccount
+from algosdk.future.transaction import LogicSig
 
 import pprint
 
@@ -489,7 +489,7 @@ class PortalCore:
                 k = k + key
 
             txns.append(transaction.ApplicationCallTxn(
-                    sender=sender.getAddress(),
+                    sender=self.vaa_verify["hash"],
                     index=appid,
                     on_complete=transaction.OnComplete.NoOpOC,
                     app_args=[b"verifySigs", b, k],
@@ -514,7 +514,7 @@ class PortalCore:
         pk = sender.getPrivateKey()
         for t in txns:
             if ("app_args" in t.__dict__ and len(t.app_args) > 0 and t.app_args[0] == b"verifySigs"):
-                grp.append(transaction.LogicSigTransaction(t, self.vaa_verify["lsa"]))
+                grp.append(transaction.LogicSigTransaction(t, self.vaa_verify["lsig"]))
             else:
                 grp.append(t.sign(pk))
 
@@ -527,10 +527,14 @@ class PortalCore:
 
         print("building our stateless vaa_verify...")
         self.vaa_verify = client.compile(get_vaa_verify())
-        self.vaa_verify["lsa"] = LogicSigAccount(base64.b64decode(self.vaa_verify["result"]))
+        self.vaa_verify["lsig"] = LogicSig(base64.b64decode(self.vaa_verify["result"]))
+        print(self.vaa_verify["hash"])
+        print("")
 
         print("Generating the foundation account...")
         foundation = self.getTemporaryAccount(client)
+        print(foundation.getAddress())
+        print("")
 
         print("Creating the PortalCore app")
         appID = self.createPortalCoreApp(client=client, sender=foundation)
@@ -542,6 +546,8 @@ class PortalCore:
 
         print("grabbing a untrusted account")
         player = self.getTemporaryAccount(client)
+        print(player.getAddress())
+        print("")
 
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(open("boot2.vaa", "r").read())
