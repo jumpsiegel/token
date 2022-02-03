@@ -218,6 +218,25 @@ def getCoreContracts(   client: AlgodClient,
 
         def verifyVAA():
             return Seq([
+                checkForDuplicate(),
+                # except for the payment txid
+                #   Verify everything in this txgrp is for THIS app
+                #   Verify account[2] is correct for this governance index
+                #   Verify all the arguments for the verifySigs are what we think they should be
+                #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
+                #          in the same way the client driver program should be using them
+                #   Verify we have checked every single signature in the vaa
+                #   Verify the number of sigs in the governance set is >= 1  (ie, we have a legit governance set)
+                #   Verify no signature is ever used twice in the vaa  (signing using one person over and over)
+                #   Verify we have at least 2/3 of the guardians signing for this VAA
+                #   Verify the verifySigs are signed from the the vphash (not passing their own VP hash)
+                Approve(),
+            ])
+
+        def governance():
+            return Seq([
+                # Verify the previous thing in the txgrp was verifyVAA
+                hdlGovernance(),
                 Approve(),
             ])
 
@@ -230,6 +249,7 @@ def getCoreContracts(   client: AlgodClient,
             [METHOD == Bytes("init"), init()],
             [METHOD == Bytes("verifySigs"), verifySigs()],
             [METHOD == Bytes("verifyVAA"), verifyVAA()],
+            [METHOD == Bytes("governance"), governance()],
         )
 
         on_create = Seq( [
