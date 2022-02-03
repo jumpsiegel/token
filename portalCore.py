@@ -237,7 +237,8 @@ def getCoreContracts(   client: AlgodClient,
                 Approve(),
             ])
 
-# example asserts
+# example asserts randlabs used
+#
 #        Assert(Txn.fee() <= Int(1000)),
 #        Assert(Txn.application_args.length() == Int(3)),
 #        Assert(Btoi(vaa_signature_count) > ((Btoi(num_guardians) * Int(10) / Int(3)) * Int(2)) / Int(10) + Int(1)),
@@ -256,6 +257,25 @@ def getCoreContracts(   client: AlgodClient,
 #            ])
 #        ),
 
+#    return Seq([
+#        Assert(Global.group_size() == get_group_size(NUM_GUARDIANS) + Int(1)),
+#        Assert(Gtxn[Global.group_size() - Int(1)].type_enum() == TxnType.ApplicationCall),
+#        Assert(Gtxn[Global.group_size() - Int(1)].application_id() == AUTHORIZED_APP_ID),
+#        Assert(Txn.application_args.length() == Int(3)),
+
+# STATELESS_LOGIC_HASH = App.globalGet(Bytes("vphash"))
+
+#        Assert(Txn.sender() == STATELESS_LOGIC_HASH),
+#        Assert(check_guardian_set_size()),
+#        Assert(check_guardian_key_subset()),
+#        SLOT_VERIFIED_BITFIELD.store(
+#            SetBit(SLOT_VERIFIED_BITFIELD.load(), Txn.group_index(), Int(1))),
+#        If(Txn.group_index() == Global.group_size() -
+#           Int(2)).Then(
+#            Return(Seq([
+#                Assert(check_final_verification_state()),
+#                commit_vaa()
+#            ]))),
 
         def governance():
             return Seq([
