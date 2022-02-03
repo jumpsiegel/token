@@ -471,19 +471,20 @@ class PortalCore:
         # and save themselves a dollar over the course of a bunch of
         # redemptions...   I can sleep at night with this
 
+        pmt = 3000
         bal = self.getBalances(client, self.vaa_verify["hash"])
-        des = 200000
+        if ((200000 - bal[0]) >= pmt):
+            pmt = 200000 - bal[0]
 
-        if (bal[0] < des):
-            print("Sending %d algo to cover fees" % (des - bal[0]))
-            txns.append(
-                transaction.PaymentTxn(
-                    sender = sender.getAddress(), 
-                    sp = sp, 
-                    receiver = self.vaa_verify["hash"], 
-                    amt = des - bal[0]
-                )
+        print("Sending %d algo to cover fees" % (pmt))
+        txns.append(
+            transaction.PaymentTxn(
+                sender = sender.getAddress(), 
+                sp = sp, 
+                receiver = self.vaa_verify["hash"], 
+                amt = pmt
             )
+        )
 
         # How many signatures can we process in a single txn
         bsize = (9*66)
@@ -491,15 +492,15 @@ class PortalCore:
 
         for i in range(blocks):
             # Which signatures will we be verifying in this block
-            b = p["signatures"][(i * bsize):]
-            if (len(b) > bsize):
-                b = b[:bsize]
+            s = p["signatures"][(i * bsize):]
+            if (len(s) > bsize):
+                s = s[:bsize]
             # keys
             k = b''
             # Grab the key associated the signature
-            for q in range(int(len(b) / 66)):
+            for q in range(int(len(s) / 66)):
                 # Which guardian is this signature associated with
-                g = b[q * 66]
+                g = s[q * 66]
                 key = keys[((g * 20) + 1) : (((g + 1) * 20) + 1)]
                 k = k + key
 
@@ -507,7 +508,7 @@ class PortalCore:
                     sender=self.vaa_verify["hash"],
                     index=appid,
                     on_complete=transaction.OnComplete.NoOpOC,
-                    app_args=[b"verifySigs", b, k],
+                    app_args=[b"verifySigs", s, k],
                     accounts=accts,
                     note = p["digest"],
                     sp=sp
@@ -518,6 +519,16 @@ class PortalCore:
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"verifyVAA", vaa],
+            accounts=accts,
+            note = p["digest"],
+            sp=sp
+        ))
+
+        txns.append(transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=appid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"governance", vaa],
             accounts=accts,
             note = p["digest"],
             sp=sp

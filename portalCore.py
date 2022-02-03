@@ -237,6 +237,26 @@ def getCoreContracts(   client: AlgodClient,
                 Approve(),
             ])
 
+# example asserts
+#        Assert(Txn.fee() <= Int(1000)),
+#        Assert(Txn.application_args.length() == Int(3)),
+#        Assert(Btoi(vaa_signature_count) > ((Btoi(num_guardians) * Int(10) / Int(3)) * Int(2)) / Int(10) + Int(1)),
+#        Assert(Len(signatures) == get_sig_count_in_step(Txn.group_index(), Btoi(num_guardians)) * Int(66)),
+#        Assert(Txn.rekey_to() == Global.zero_address()),
+#        Assert(Txn.application_id() == Int(vaa_processor_app_id)),
+#        Assert(Txn.type_enum() == TxnType.ApplicationCall),
+#        Assert(Global.group_size() == Int(1) + get_group_size(Btoi(num_guardians))),
+#
+#        For(i.store(Int(1)),
+#            i.load() < Global.group_size() - Int(1),
+#            i.store(i.load() + Int(1))).Do(Seq([
+#                Assert(Gtxn[i.load()].type_enum() == TxnType.ApplicationCall),
+#                Assert(Gtxn[i.load()].application_id() == Txn.application_id()),
+#                Assert(GetBit(ImportScratchValue(i.load() - Int(1), SLOTID_VERIFIED_BIT), i.load() - Int(1)) == Int(1))
+#            ])
+#        ),
+
+
         def governance():
             return Seq([
                 # Verify the previous thing in the txgrp was verifyVAA
