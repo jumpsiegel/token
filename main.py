@@ -334,7 +334,7 @@ class PortalCore:
         for i in range(ret["siglen"]):
             ret["sigs"].append(vaa[(6 + (i * 66)):(6 + (i * 66)) + 66].hex())
         off = (ret["siglen"] * 66) + 6
-        ret["digest"] = vaa[off:].hex()  # This is what is actually signed...
+        ret["digest"] = vaa[off:]  # This is what is actually signed...
         ret["timestamp"] = int.from_bytes(vaa[off:(off + 4)], "big")
         off += 4
         ret["nonce"] = int.from_bytes(vaa[off:(off + 4)], "big")
@@ -431,9 +431,9 @@ class PortalCore:
                 ret = ret + vals[k]
         return ret
 
-    # There is no client side duplicate suppression or validity
-    # checking since we need to be able to detect all failure cases in
-    # the contract itself and we want to use this to drive the test
+    # There is no client side duplicate suppression, error checking, or validity
+    # checking. We need to be able to detect all failure cases in
+    # the contract itself and we want to use this to drive the failure test
     # cases
 
     def submitVAA(self, vaa, client, sender, appid):
@@ -457,14 +457,25 @@ class PortalCore:
 
         txns = []
 
-        # How many signatures can we process in a single pass
-        bsize = (7*66)
-        blocks = int(len(p["signatures"]) / bsize) + 1
+        # Right now there is not really a good way to estimate the fees,
+        # in production, on a conjested network, how much verifying
+        # the signatures is going to cost.
+
+        # So, what we do instead
+        # is we top off the verifier back up to 2A so effectively we
+        # are paying for the previous persons verification which on a
+        # unconjested network should be the exact same cost as our
+        # transaction.. 
+
+        # I guess it is possible for a hacker to eliminate this step
+        # and save themselves a dollar over the course of a bunch of
+        # redemptions...   I can sleep at night with this
 
         bal = self.getBalances(client, self.vaa_verify["hash"])
-        des = 200000 + 1000 * blocks
+        des = 200000
 
         if (bal[0] < des):
+            print("Sending %d algo to cover fees" % (des - bal[0]))
             txns.append(
                 transaction.PaymentTxn(
                     sender = sender.getAddress(), 
@@ -473,6 +484,10 @@ class PortalCore:
                     amt = des - bal[0]
                 )
             )
+
+        # How many signatures can we process in a single txn
+        bsize = (9*66)
+        blocks = int(len(p["signatures"]) / bsize) + 1
 
         for i in range(blocks):
             # Which signatures will we be verifying in this block
