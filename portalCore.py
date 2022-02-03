@@ -136,8 +136,7 @@ def getCoreContracts(   client: AlgodClient,
                 # Now, lets go grab the raw byte
                 b.store(blob.get_byte(Int(1), byte_offset.load())),
 
-                # TODO
-                # I would hope we've never seen this packet before...   throw an exception if we have?
+                # I would hope we've never seen this packet before...   throw an exception if we have
                 Assert(GetBit(b.load(), sequence.load() % Int(8)) == Int(0)),
 
                 # Lets mark this bit so that we never see it again
@@ -218,17 +217,22 @@ def getCoreContracts(   client: AlgodClient,
 
         def verifyVAA():
             return Seq([
-                checkForDuplicate(),
+                checkForDuplicate(), # Verify this is not a duplicate message
                 # except for the payment txid
-                #   Verify everything in this txgrp is for THIS app
+                #   There should always be 1 payment txid at the start for at least 3000 to the vphash...
+                #   All txn's should either be coming from that payment sender or from the vphash
+                #   Verify everything in this txgrp is for THIS app (cannot be running their own code)
                 #   Verify account[2] is correct for this governance index
                 #   Verify all the arguments for the verifySigs are what we think they should be
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
                 #          in the same way the client driver program should be using them
+                #       The txn.note() needs to be pointed at the correct thing
+                #   Verify nobody is using a unauthorized lsig anywhere (is this possible?) to sign for this app.. right?
                 #   Verify we have checked every single signature in the vaa
+                #      Did we skip any?
                 #   Verify the number of sigs in the governance set is >= 1  (ie, we have a legit governance set)
                 #   Verify no signature is ever used twice in the vaa  (signing using one person over and over)
-                #   Verify we have at least 2/3 of the guardians signing for this VAA
+                #   Verify we have at least int(2/3) + 1 of the guardians signing for this VAA
                 #   Verify the verifySigs are signed from the the vphash (not passing their own VP hash)
                 Approve(),
             ])
