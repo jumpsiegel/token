@@ -228,6 +228,8 @@ def getCoreContracts(   client: AlgodClient,
             digest = ScratchVar()
             hits = ScratchVar()
             s = ScratchVar()
+            eoff = ScratchVar()
+            guardian = ScratchVar()
 
             return Seq([
                 checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
@@ -283,7 +285,15 @@ def getCoreContracts(   client: AlgodClient,
                                     # Lets see if they are actually verifying the correct signatures!
                                     s.store(Gtxn[i.load()].application_args[1]),
                                     Assert(Extract(Txn.application_args[1], off.load(), Len(s.load())) == s.load()),
-                                    off.store(off.load() + Len(s.load())),
+                                    eoff.store(off.load() + Len(s.load())),
+
+                                    While(off.load() < eoff.load()).Do(Seq( [
+                                            guardian.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+                                            Assert(GetBit(hits.load(), guardian.load()) == Int(0)),
+                                            hits.store(SetBit(hits.load(), guardian.load(), Int(1))),
+
+                                            off.store(off.load() + Int(66))
+                                    ])),
 
                                     # arg[1] = sigs
                                     # arg[2] = kset
@@ -306,8 +316,6 @@ def getCoreContracts(   client: AlgodClient,
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
                 #          in the same way the client driver program should be using them
                 #       The txn.note() needs to be pointed at the correct thing
-                #   Verify we have checked every single signature in the vaa
-                #      Did we skip any?
                 #   Verify no signature is ever used twice in the vaa  (signing using one person over and over)
                 Approve(),
             ])
