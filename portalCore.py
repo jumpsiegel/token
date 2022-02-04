@@ -288,9 +288,10 @@ def getCoreContracts(   client: AlgodClient,
                                     eoff.store(off.load() + Len(s.load())),
 
                                     While(off.load() < eoff.load()).Do(Seq( [
+                                            # Lets see if we ever reuse the same signature more then once
                                             guardian.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
                                             Assert(GetBit(hits.load(), guardian.load()) == Int(0)),
-                                            hits.store(SetBit(hits.load(), guardian.load(), Int(1))),
+                                            hits.store(SetBit(hits.load(), guardian.load() + Int(1), Int(1))),
 
                                             off.store(off.load() + Int(66))
                                     ])),
@@ -315,8 +316,6 @@ def getCoreContracts(   client: AlgodClient,
                 #   Verify all the arguments for the verifySigs are what we think they should be
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
                 #          in the same way the client driver program should be using them
-                #       The txn.note() needs to be pointed at the correct thing
-                #   Verify no signature is ever used twice in the vaa  (signing using one person over and over)
                 Approve(),
             ])
 
