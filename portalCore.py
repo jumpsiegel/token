@@ -226,6 +226,8 @@ def getCoreContracts(   client: AlgodClient,
             num_sigs = ScratchVar()
             off = ScratchVar()
             digest = ScratchVar()
+            hits = ScratchVar()
+            s = ScratchVar()
 
             return Seq([
                 checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
@@ -236,6 +238,7 @@ def getCoreContracts(   client: AlgodClient,
                 # Lets grab the total keyset
                 total_guardians.store(blob.get_byte(Int(2), Int(0))),
                 guardian_keys.store(blob.read(Int(2), Int(1), Int(20) * total_guardians.load())),
+                hits.store(Bytes("base16", "0x00000000")),
 
                 # How many signatures are in this vaa?
                 num_sigs.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1)))),
@@ -259,6 +262,9 @@ def getCoreContracts(   client: AlgodClient,
                     Gtxn[0].receiver() == STATELESS_LOGIC_HASH
                 )),
 
+                # Point it at the start of the signatures in the VAA
+                off.store(Int(6)),
+
                 For(
                         i.store(Int(1)),
                         i.load() <= Txn.group_index(),
@@ -274,10 +280,17 @@ def getCoreContracts(   client: AlgodClient,
                             Cond(
                                 [a.load() == Bytes("nop"), Seq([])],
                                 [a.load() == Bytes("verifySigs"), Seq([
+                                    s.store(Gtxn[i.load()].application_args[1]),
+                                    Assert(Extract(Txn.application_args[1], off.load(), Len(s.load())) == s.load()),
+                                    off.store(off.load() + Len(s.load())),
+
+                                    # arg[1] = sigs
+                                    # arg[2] = kset
                                     Assert(And(
                                         Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
                                         Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same vaa?
-                                    ))
+                                    )),
+                                    
                                 ])],
                                 [a.load() == Bytes("verifyVAA"), Seq([])],
                             )
@@ -286,7 +299,6 @@ def getCoreContracts(   client: AlgodClient,
 
 
                 # except for the payment txid
-                #   Verify account[2] is correct for this governance index
                 #   Verify all the arguments for the verifySigs are what we think they should be
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
                 #          in the same way the client driver program should be using them
