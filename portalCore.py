@@ -279,7 +279,7 @@ def getCoreContracts(   client: AlgodClient,
                                 [a.load() == Bytes("verifySigs"), Seq([
                                     Assert(And(
                                         Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
-                                        Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same code?
+                                        Gtxn[i.load()].application_args[3] != digest.load()  # Was it verifying the same code?
                                     ))
                                 ])],
                                 [a.load() == Bytes("verifyVAA"), Seq([])],
