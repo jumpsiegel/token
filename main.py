@@ -464,10 +464,6 @@ class PortalCore:
         # unconjested network should be the exact same cost as our
         # transaction.. 
 
-        # I guess it is possible for a hacker to eliminate this step
-        # and save themselves a dollar over the course of a bunch of
-        # redemptions...   I can sleep at night with this
-
         pmt = 3000
         bal = self.getBalances(client, self.vaa_verify["hash"])
         if ((200000 - bal[0]) >= pmt):
@@ -488,7 +484,8 @@ class PortalCore:
         blocks = int(len(p["signatures"]) / bsize) + 1
 
         # We don't pass the entire payload in but instead just pass it pre digested.  This gets around size
-        # limitations with lsigs AND reduces the cost of the entire operation on a conjested network
+        # limitations with lsigs AND reduces the cost of the entire operation on a conjested network by reducing the
+        # bytes passed into the transaction
         digest = keccak.new(digest_bits=256).update(keccak.new(digest_bits=256).update(p["digest"]).digest()).digest()
 
         for i in range(blocks):

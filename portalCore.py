@@ -224,9 +224,12 @@ def getCoreContracts(   client: AlgodClient,
             total_guardians = ScratchVar()
             guardian_keys = ScratchVar()
             num_sigs = ScratchVar()
+            off = ScratchVar()
+            digest = ScratchVar()
 
             return Seq([
                 checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
+
 
                 # We have a guardian set?  We have OUR guardian set?
                 Assert(Txn.accounts[2] == get_sig_address(Btoi(Extract(Txn.application_args[1], Int(1), Int(4))), Bytes("guardian"))),
@@ -237,6 +240,9 @@ def getCoreContracts(   client: AlgodClient,
 
                 # How many signatures are in this vaa?
                 num_sigs.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1)))),
+
+                off.store(Int(6) + (num_sigs.load() * Int(66))),
+                digest.store(Keccak256(Keccak256(Extract(Txn.application_args[1], off.load(), Len(Txn.application_args[1]) - off.load())))),
 
                 # This passed when we had 19 guardians... so, this worked as expected
                 #Assert((((total_guardians.load() * Int(2)) / Int(3)) + Int(1)) == Int(13)),
@@ -262,9 +268,8 @@ def getCoreContracts(   client: AlgodClient,
                         i.store(i.load() + Int(1))).Do(Seq([
                             Assert(And(
                                 Gtxn[i.load()].type_enum() == TxnType.ApplicationCall,
+                                Gtxn[i.load()].rekey_to() == Global.zero_address(),
                                 Gtxn[i.load()].application_id() == Txn.application_id(),
-                                # accounts[0] is not the same?!
-                                #  t.load().accounts[0] == Txn.accounts[0],    
                                 Gtxn[i.load()].accounts[1] == Txn.accounts[1],
                                 Gtxn[i.load()].accounts[2] == Txn.accounts[2],
                             )),
@@ -272,7 +277,10 @@ def getCoreContracts(   client: AlgodClient,
                             Cond(
                                 [a.load() == Bytes("nop"), Seq([])],
                                 [a.load() == Bytes("verifySigs"), Seq([
-                                    Assert(Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH),
+                                    Assert(And(
+                                        Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
+                                        Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same code?
+                                    ))
                                 ])],
                                 [a.load() == Bytes("verifyVAA"), Seq([])],
                             )
