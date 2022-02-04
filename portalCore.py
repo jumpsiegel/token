@@ -118,31 +118,6 @@ def getCoreContracts(   client: AlgodClient,
         def nop():
             return Seq([Approve()])
 
-        @Subroutine(TealType.none)
-        def checkForDuplicate():
-            off = ScratchVar()
-            emitter = ScratchVar()
-            sequence = ScratchVar()
-            b = ScratchVar()
-            byte_offset = ScratchVar()
-
-            return Seq(
-                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
-                emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
-                sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
-                byte_offset.store(sequence.load() / Int(max_bits)),
-                # They passed us the correct account?
-                Assert(Txn.accounts[1] == get_sig_address(byte_offset.load(), emitter.load())),
-                # Now, lets go grab the raw byte
-                b.store(blob.get_byte(Int(1), byte_offset.load())),
-
-                # I would hope we've never seen this packet before...   throw an exception if we have
-                Assert(GetBit(b.load(), sequence.load() % Int(8)) == Int(0)),
-
-                # Lets mark this bit so that we never see it again
-                blob.set_byte(Int(1), byte_offset.load(), SetBit(b.load(), sequence.load() % Int(8), Int(1)))
-            )
-        
         def hdlGovernance():
             off = ScratchVar()
             a = ScratchVar()
@@ -215,13 +190,73 @@ def getCoreContracts(   client: AlgodClient,
                 Approve(),
             ])
 
+
+        @Subroutine(TealType.none)
+        def checkForDuplicate():
+            off = ScratchVar()
+            emitter = ScratchVar()
+            sequence = ScratchVar()
+            b = ScratchVar()
+            byte_offset = ScratchVar()
+
+            return Seq(
+                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
+                emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
+                sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
+                byte_offset.store(sequence.load() / Int(max_bits)),
+                # They passed us the correct account?
+                Assert(Txn.accounts[1] == get_sig_address(byte_offset.load(), emitter.load())),
+                # Now, lets go grab the raw byte
+                b.store(blob.get_byte(Int(1), byte_offset.load())),
+
+                # I would hope we've never seen this packet before...   throw an exception if we have
+                Assert(GetBit(b.load(), sequence.load() % Int(8)) == Int(0)),
+
+                # Lets mark this bit so that we never see it again
+                blob.set_byte(Int(1), byte_offset.load(), SetBit(b.load(), sequence.load() % Int(8), Int(1)))
+            )
+
+        STATELESS_LOGIC_HASH = App.globalGet(Bytes("vphash"))
+
         def verifyVAA():
+            i = ScratchVar()
+            a = ScratchVar()
+
             return Seq([
                 checkForDuplicate(), # Verify this is not a duplicate message
-                # except for the payment txid
                 #   There should always be 1 payment txid at the start for at least 3000 to the vphash...
-                #   All txn's should either be coming from that payment sender or from the vphash
-                #   Verify everything in this txgrp is for THIS app (cannot be running their own code)
+                Assert(And(
+                    Gtxn[0].type_enum() == TxnType.Payment,
+                    Gtxn[0].amount() >= Int(3000),
+                    Gtxn[0].receiver() == STATELESS_LOGIC_HASH
+                )),
+
+                For(
+                        i.store(Int(1)),
+                        i.load() < Global.group_size() - Int(1),
+                        i.store(i.load() + Int(1))).Do(Seq([
+                            Assert(And(
+                                Gtxn[i.load()].type_enum() == TxnType.ApplicationCall,
+                                Gtxn[i.load()].application_id() == Txn.application_id(),
+                                # accounts[0] is not the same?!
+                                #  t.load().accounts[0] == Txn.accounts[0],    
+                                Gtxn[i.load()].accounts[1] == Txn.accounts[1],
+                                Gtxn[i.load()].accounts[2] == Txn.accounts[2],
+                            )),
+                            a.store(Gtxn[i.load()].application_args[0]),
+                            Log(a.load()),
+                            Cond(
+                                [a.load() == Bytes("nop"), Seq([])],
+                                [a.load() == Bytes("verifySigs"), Seq([
+                                    Assert(Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH),
+                                ])],
+                                [a.load() == Bytes("verifyVAA"), Seq([])],
+                            )
+                        ])
+                ),
+
+
+                # except for the payment txid
                 #   Verify account[2] is correct for this governance index
                 #   Verify all the arguments for the verifySigs are what we think they should be
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
@@ -263,7 +298,6 @@ def getCoreContracts(   client: AlgodClient,
 #        Assert(Gtxn[Global.group_size() - Int(1)].application_id() == AUTHORIZED_APP_ID),
 #        Assert(Txn.application_args.length() == Int(3)),
 
-# STATELESS_LOGIC_HASH = App.globalGet(Bytes("vphash"))
 
 #        Assert(Txn.sender() == STATELESS_LOGIC_HASH),
 #        Assert(check_guardian_set_size()),

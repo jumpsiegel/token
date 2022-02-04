@@ -393,7 +393,7 @@ class PortalCore:
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"init", vaa, self.vaa_verify["hash"]],
+            app_args=[b"init", vaa, decode_address(self.vaa_verify["hash"])],
             accounts=[seq_addr, guardian_addr, newguardian_addr],
             sp=client.suggested_params(),
         )
@@ -545,7 +545,7 @@ class PortalCore:
                 grp.append(t.sign(pk))
 
         client.send_transactions(grp)
-        response = self.waitForTransaction(client, grp[-1].get_txid())
+        response = self.waitForTransaction(client, grp[-2].get_txid())
         pprint.pprint(response.__dict__)
 
     def simple_core(self):
