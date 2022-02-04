@@ -1,9 +1,4 @@
-# source .. few messages...
-#   <smartContract>  <EmitterChain>   ->   <algo asset>  <smartContract> <EmitterChain>
-#   <GovernanceIndex (int)> -> <algo app>      19 publicKeys for VAA signers  <32*19>
-
-# Lots of sequence numbers... optimize for space
-#   <EmitterSource> <SequenceNumber>  ->   <Bit>  (duplicate suppresion)
+# python3 -m pip install -I pycryptodomex
 
 from time import time, sleep
 from typing import List, Tuple, Dict, Any, Optional, Union
@@ -29,6 +24,8 @@ from pyteal import compileTeal, Mode, Expr
 from pyteal import *
 from algosdk.logic import get_application_address
 from vaa_verify import get_vaa_verify
+
+from Cryptodome.Hash import keccak
 
 from algosdk.future.transaction import LogicSig
 
@@ -490,6 +487,10 @@ class PortalCore:
         bsize = (9*66)
         blocks = int(len(p["signatures"]) / bsize) + 1
 
+        # We don't pass the entire payload in but instead just pass it pre digested.  This gets around size
+        # limitations with lsigs AND reduces the cost of the entire operation on a conjested network
+        digest = keccak.new(digest_bits=256).update(keccak.new(digest_bits=256).update(p["digest"]).digest()).digest()
+
         for i in range(blocks):
             # Which signatures will we be verifying in this block
             s = p["signatures"][(i * bsize):]
@@ -508,9 +509,8 @@ class PortalCore:
                     sender=self.vaa_verify["hash"],
                     index=appid,
                     on_complete=transaction.OnComplete.NoOpOC,
-                    app_args=[b"verifySigs", s, k],
+                    app_args=[b"verifySigs", s, k, digest],
                     accounts=accts,
-                    note = p["digest"],
                     sp=sp
                 ))
 

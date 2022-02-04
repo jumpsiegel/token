@@ -47,19 +47,17 @@ SLOTID_RECOVERED_PK_X = 240
 SLOTID_RECOVERED_PK_Y = 241
 
 @Subroutine(TealType.uint64)
-def sig_check(signatures, digest, keys):
+def sig_check(signatures, dhash, keys):
     si = ScratchVar(TealType.uint64)  # signature index (zero-based)
     ki = ScratchVar(TealType.uint64)  # key index
     slen = ScratchVar(TealType.uint64)  # signature length
     rec_pk_x = ScratchVar(TealType.bytes, SLOTID_RECOVERED_PK_X)
     rec_pk_y = ScratchVar(TealType.bytes, SLOTID_RECOVERED_PK_Y)
-    dhash = ScratchVar(TealType.bytes)
 
     return Seq(
         [
             rec_pk_x.store(Bytes("")),
             rec_pk_y.store(Bytes("")),
-            dhash.store(Keccak256(Keccak256(digest))),
             slen.store(Len(signatures)),
             For(Seq([
                 si.store(Int(0)),
@@ -73,7 +71,7 @@ def sig_check(signatures, digest, keys):
                     Seq([
                         InlineAssembly(
                             "ecdsa_pk_recover Secp256k1",
-                            dhash.load(),
+                            dhash,
                             Btoi(Extract(signatures, si.load() + Int(65), Int(1))),
                             Extract(signatures, si.load() + Int(1), Int(32)),       # R
                             Extract(signatures, si.load() + Int(33), Int(32)),      # S
@@ -94,14 +92,14 @@ def sig_check(signatures, digest, keys):
     )
 
 def vaa_verify_program():
-    digest = Txn.note()
     signatures = Txn.application_args[1]
     keys = Txn.application_args[2]
+    dhash = Txn.application_args[3]
 
     return Seq([
         Assert(Txn.rekey_to() == Global.zero_address()),
         Assert(Txn.type_enum() == TxnType.ApplicationCall),
-        Assert(sig_check(signatures, digest, keys)),
+        Assert(sig_check(signatures, dhash, keys)),
         Approve()]
     )
 
