@@ -172,6 +172,9 @@ def getCoreContracts(   client: AlgodClient,
 
         def init():
             return Seq([
+                # You better lose yourself in the music, the moment
+                App.globalPut(Bytes("vphash"), Txn.application_args[2]),
+
                 # You own it, you better never let it go
                 Assert(Txn.sender() == Global.creator_address()),
 
@@ -180,9 +183,9 @@ def getCoreContracts(   client: AlgodClient,
                 App.globalPut(Bytes("booted"), Bytes("true")),
 
                 # This opportunity comes once in a lifetime
-                App.globalPut(Bytes("vphash"), Txn.application_args[2]),
+                checkForDuplicate(),
 
-                # yo
+                # You can do anything you set your mind to...
                 hdlGovernance()
             ])
 
@@ -258,7 +261,7 @@ def getCoreContracts(   client: AlgodClient,
                     )),
 
 
-                #   There should always be 1 payment txid at the start for at least 3000 to the vphash...
+                # There should always be 1 payment txid at the start for at least 3000 to the vphash...
                 Assert(And(
                     Gtxn[0].type_enum() == TxnType.Payment,
                     Gtxn[0].amount() >= Int(3000),

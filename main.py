@@ -460,9 +460,8 @@ class PortalCore:
 
         # So, what we do instead
         # is we top off the verifier back up to 2A so effectively we
-        # are paying for the previous persons verification which on a
-        # unconjested network should be the exact same cost as our
-        # transaction.. 
+        # are paying for the previous persons overrage which on a
+        # unconjested network should be zero
 
         pmt = 3000
         bal = self.getBalances(client, self.vaa_verify["hash"])
@@ -479,7 +478,7 @@ class PortalCore:
             )
         )
 
-        # How many signatures can we process in a single txn
+        # How many signatures can we process in a single txn... we can do 9!
         bsize = (9*66)
         blocks = int(len(p["signatures"]) / bsize) + 1
 
