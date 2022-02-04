@@ -280,7 +280,6 @@ def getCoreContracts(   client: AlgodClient,
                             )),
                             a.store(Gtxn[i.load()].application_args[0]),
                             Cond(
-                                [a.load() == Bytes("nop"), Seq([])],
                                 [a.load() == Bytes("verifySigs"), Seq([
                                     # Lets see if they are actually verifying the correct signatures!
                                     s.store(Gtxn[i.load()].application_args[1]),
@@ -301,13 +300,13 @@ def getCoreContracts(   client: AlgodClient,
                                     ])),
 
                                     Assert(And(
-                                        # Does the keyset passed into the verify routines match what it should be?
-                                        Gtxn[i.load()].application_args[2] == s.load(),
+                                        Gtxn[i.load()].application_args[2] == s.load(),      # Does the keyset passed into the verify routines match what it should be?
                                         Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
                                         Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same vaa?
                                     )),
                                     
                                 ])],
+                                [a.load() == Bytes("nop"), Seq([])],       # if there is a function call not listed here, it will throw an error
                                 [a.load() == Bytes("verifyVAA"), Seq([])],
                             )
                         ])
@@ -321,6 +320,13 @@ def getCoreContracts(   client: AlgodClient,
 
         def governance():
             return Seq([
+                Assert(And(
+                    Gtxn[Txn.group_index() - Int(1)].application_id() == Txn.application_id(),
+                    Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("verifyVAA"),
+                    Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                    (Global.group_size() - Int(1)) == Txn.group_index()    # governance should be the last entry...
+                )),
+                    
                 # Verify the previous thing in the txgrp was verifyVAA
                 hdlGovernance(),
                 Approve(),
