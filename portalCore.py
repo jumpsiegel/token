@@ -300,11 +300,9 @@ def getCoreContracts(   client: AlgodClient,
                                             off.store(off.load() + Int(66))
                                     ])),
 
-                                    Assert(Gtxn[i.load()].application_args[2] == s.load()),
-
-                                    # arg[1] = sigs
-                                    # arg[2] = kset
                                     Assert(And(
+                                        # Does the keyset passed into the verify routines match what it should be?
+                                        Gtxn[i.load()].application_args[2] == s.load(),
                                         Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
                                         Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same vaa?
                                     )),
@@ -318,10 +316,6 @@ def getCoreContracts(   client: AlgodClient,
                 # Did we verify all the signatures?
                 Assert(off.load() == Int(6) + (num_sigs.load() * Int(66))),
 
-                # except for the payment txid
-                #   Verify all the arguments for the verifySigs are what we think they should be
-                #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
-                #          in the same way the client driver program should be using them
                 Approve(),
             ])
 
