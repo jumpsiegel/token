@@ -230,7 +230,6 @@ def getCoreContracts(   client: AlgodClient,
             return Seq([
                 checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
 
-
                 # We have a guardian set?  We have OUR guardian set?
                 Assert(Txn.accounts[2] == get_sig_address(Btoi(Extract(Txn.application_args[1], Int(1), Int(4))), Bytes("guardian"))),
 
@@ -241,17 +240,15 @@ def getCoreContracts(   client: AlgodClient,
                 # How many signatures are in this vaa?
                 num_sigs.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1)))),
 
+                # Lets create a digest of THIS vaa...
                 off.store(Int(6) + (num_sigs.load() * Int(66))),
                 digest.store(Keccak256(Keccak256(Extract(Txn.application_args[1], off.load(), Len(Txn.application_args[1]) - off.load())))),
-
-                # This passed when we had 19 guardians... so, this worked as expected
-                #Assert((((total_guardians.load() * Int(2)) / Int(3)) + Int(1)) == Int(13)),
 
                 # We have enough signatures?
                 Assert(And(
                     total_guardians.load() > Int(0),
                     num_sigs.load() <= total_guardians.load(),
-                    num_sigs.load() > (((total_guardians.load() * Int(2)) / Int(3))),
+                    num_sigs.load() > ((total_guardians.load() * Int(2)) / Int(3)),
                     )),
 
 
@@ -279,7 +276,7 @@ def getCoreContracts(   client: AlgodClient,
                                 [a.load() == Bytes("verifySigs"), Seq([
                                     Assert(And(
                                         Gtxn[i.load()].sender() == STATELESS_LOGIC_HASH,     # Was it signed with our code?
-                                        Gtxn[i.load()].application_args[3] != digest.load()  # Was it verifying the same code?
+                                        Gtxn[i.load()].application_args[3] == digest.load()  # Was it verifying the same vaa?
                                     ))
                                 ])],
                                 [a.load() == Bytes("verifyVAA"), Seq([])],
@@ -294,13 +291,9 @@ def getCoreContracts(   client: AlgodClient,
                 #       This involves mapping the signatures in the vaa to the keys in Local_state(2)
                 #          in the same way the client driver program should be using them
                 #       The txn.note() needs to be pointed at the correct thing
-                #   Verify nobody is using a unauthorized lsig anywhere (is this possible?) to sign for this app.. right?
                 #   Verify we have checked every single signature in the vaa
                 #      Did we skip any?
-                #   Verify the number of sigs in the governance set is >= 1  (ie, we have a legit governance set)
                 #   Verify no signature is ever used twice in the vaa  (signing using one person over and over)
-                #   Verify we have at least int(2/3) + 1 of the guardians signing for this VAA
-                #   Verify the verifySigs are signed from the the vphash (not passing their own VP hash)
                 Approve(),
             ])
 
