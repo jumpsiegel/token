@@ -497,19 +497,19 @@ class PortalCore:
             if (len(sigs) > bsize):
                 sigs = sigs[:bsize]
             # keys
-            k = b''
+            kset = b''
             # Grab the key associated the signature
             for q in range(int(len(sigs) / 66)):
                 # Which guardian is this signature associated with
                 g = sigs[q * 66]
                 key = keys[((g * 20) + 1) : (((g + 1) * 20) + 1)]
-                k = k + key
+                kset = kset + key
 
             txns.append(transaction.ApplicationCallTxn(
                     sender=self.vaa_verify["hash"],
                     index=appid,
                     on_complete=transaction.OnComplete.NoOpOC,
-                    app_args=[b"verifySigs", sigs, k, digest],
+                    app_args=[b"verifySigs", sigs, kset, digest],
                     accounts=accts,
                     sp=sp
                 ))
