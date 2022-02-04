@@ -145,6 +145,7 @@ def getCoreContracts(   client: AlgodClient,
                         # to perform the actual upgrade
                         Assert(Extract(Txn.application_args[1], off.load() + Int(1), Int(2)) == Bytes("base16", "0008")),
                         off.store(off.load() + Int(3)),
+
                         App.globalPut(Bytes("validUpdateApproveHash"), Extract(Txn.application_args[1], off.load(), Int(32)))
                     ])],
                     [a.load() == Int(2), Seq([
@@ -327,7 +328,6 @@ def getCoreContracts(   client: AlgodClient,
                     (Global.group_size() - Int(1)) == Txn.group_index()    # governance should be the last entry...
                 )),
                     
-                # Verify the previous thing in the txgrp was verifyVAA
                 hdlGovernance(),
                 Approve(),
             ])
