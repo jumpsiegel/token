@@ -280,6 +280,7 @@ def getCoreContracts(   client: AlgodClient,
                             Cond(
                                 [a.load() == Bytes("nop"), Seq([])],
                                 [a.load() == Bytes("verifySigs"), Seq([
+                                    # Lets see if they are actually verifying the correct signatures!
                                     s.store(Gtxn[i.load()].application_args[1]),
                                     Assert(Extract(Txn.application_args[1], off.load(), Len(s.load())) == s.load()),
                                     off.store(off.load() + Len(s.load())),
@@ -297,6 +298,8 @@ def getCoreContracts(   client: AlgodClient,
                         ])
                 ),
 
+                # Did we verify all the signatures?
+                Assert(off.load() == Int(6) + (num_sigs.load() * Int(66))),
 
                 # except for the payment txid
                 #   Verify all the arguments for the verifySigs are what we think they should be
