@@ -221,9 +221,32 @@ def getCoreContracts(   client: AlgodClient,
         def verifyVAA():
             i = ScratchVar()
             a = ScratchVar()
+            total_guardians = ScratchVar()
+            guardian_keys = ScratchVar()
+            num_sigs = ScratchVar()
 
             return Seq([
-                checkForDuplicate(), # Verify this is not a duplicate message
+                checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
+
+                # We have a guardian set?  We have OUR guardian set?
+                Assert(Txn.accounts[2] == get_sig_address(Btoi(Extract(Txn.application_args[1], Int(1), Int(4))), Bytes("guardian"))),
+
+                # Lets grab the total keyset
+                total_guardians.store(blob.get_byte(Int(2), Int(0))),
+                guardian_keys.store(blob.read(Int(2), Int(1), Int(20) * total_guardians.load())),
+
+                # How many signatures are in this vaa?
+                num_sigs.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1)))),
+
+                # This passed when we had 19 guardians... so, this worked as expected
+                #Assert((((total_guardians.load() * Int(2)) / Int(3)) + Int(1)) == Int(13)),
+
+                Assert(And(
+                    total_guardians.load() > Int(0),
+                    num_sigs.load() >= (((total_guardians.load() * Int(2)) / Int(3)) + Int(1))
+                    )),
+
+
                 #   There should always be 1 payment txid at the start for at least 3000 to the vphash...
                 Assert(And(
                     Gtxn[0].type_enum() == TxnType.Payment,
@@ -244,7 +267,6 @@ def getCoreContracts(   client: AlgodClient,
                                 Gtxn[i.load()].accounts[2] == Txn.accounts[2],
                             )),
                             a.store(Gtxn[i.load()].application_args[0]),
-                            Log(a.load()),
                             Cond(
                                 [a.load() == Bytes("nop"), Seq([])],
                                 [a.load() == Bytes("verifySigs"), Seq([
