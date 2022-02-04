@@ -239,7 +239,7 @@ def getCoreContracts(   client: AlgodClient,
 
                 # Lets grab the total keyset
                 total_guardians.store(blob.get_byte(Int(2), Int(0))),
-                guardian_keys.store(blob.read(Int(2), Int(1), Int(20) * total_guardians.load())),
+                guardian_keys.store(blob.read(Int(2), Int(1), Int(1) + Int(20) * total_guardians.load())),
                 hits.store(Bytes("base16", "0x00000000")),
 
                 # How many signatures are in this vaa?
@@ -287,14 +287,20 @@ def getCoreContracts(   client: AlgodClient,
                                     Assert(Extract(Txn.application_args[1], off.load(), Len(s.load())) == s.load()),
                                     eoff.store(off.load() + Len(s.load())),
 
+                                    s.store(Bytes("")),
+
                                     While(off.load() < eoff.load()).Do(Seq( [
-                                            # Lets see if we ever reuse the same signature more then once
+                                            # Lets see if we ever reuse the same signature more then once (same guardian over and over)
                                             guardian.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
                                             Assert(GetBit(hits.load(), guardian.load()) == Int(0)),
-                                            hits.store(SetBit(hits.load(), guardian.load() + Int(1), Int(1))),
+                                            hits.store(SetBit(hits.load(), guardian.load(), Int(1))),
+                                            
+                                            s.store(Concat(s.load(), Extract(guardian_keys.load(), guardian.load() * Int(20), Int(20)))),
 
                                             off.store(off.load() + Int(66))
                                     ])),
+
+                                    Assert(Gtxn[i.load()].application_args[2] == s.load()),
 
                                     # arg[1] = sigs
                                     # arg[2] = kset
