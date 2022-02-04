@@ -241,9 +241,11 @@ def getCoreContracts(   client: AlgodClient,
                 # This passed when we had 19 guardians... so, this worked as expected
                 #Assert((((total_guardians.load() * Int(2)) / Int(3)) + Int(1)) == Int(13)),
 
+                # We have enough signatures?
                 Assert(And(
                     total_guardians.load() > Int(0),
-                    num_sigs.load() >= (((total_guardians.load() * Int(2)) / Int(3)) + Int(1))
+                    num_sigs.load() <= total_guardians.load(),
+                    num_sigs.load() > (((total_guardians.load() * Int(2)) / Int(3))),
                     )),
 
 
@@ -256,7 +258,7 @@ def getCoreContracts(   client: AlgodClient,
 
                 For(
                         i.store(Int(1)),
-                        i.load() < Global.group_size() - Int(1),
+                        i.load() <= Txn.group_index(),
                         i.store(i.load() + Int(1))).Do(Seq([
                             Assert(And(
                                 Gtxn[i.load()].type_enum() == TxnType.ApplicationCall,
