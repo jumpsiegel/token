@@ -493,15 +493,15 @@ class PortalCore:
 
         for i in range(blocks):
             # Which signatures will we be verifying in this block
-            s = p["signatures"][(i * bsize):]
-            if (len(s) > bsize):
-                s = s[:bsize]
+            sigs = p["signatures"][(i * bsize):]
+            if (len(sigs) > bsize):
+                sigs = s[:bsize]
             # keys
             k = b''
             # Grab the key associated the signature
-            for q in range(int(len(s) / 66)):
+            for q in range(int(len(sigs) / 66)):
                 # Which guardian is this signature associated with
-                g = s[q * 66]
+                g = sigs[q * 66]
                 key = keys[((g * 20) + 1) : (((g + 1) * 20) + 1)]
                 k = k + key
 
@@ -509,7 +509,7 @@ class PortalCore:
                     sender=self.vaa_verify["hash"],
                     index=appid,
                     on_complete=transaction.OnComplete.NoOpOC,
-                    app_args=[b"verifySigs", s, k, digest],
+                    app_args=[b"verifySigs", sigs, k, digest],
                     accounts=accts,
                     sp=sp
                 ))
