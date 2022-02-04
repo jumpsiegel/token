@@ -495,7 +495,7 @@ class PortalCore:
             # Which signatures will we be verifying in this block
             sigs = p["signatures"][(i * bsize):]
             if (len(sigs) > bsize):
-                sigs = s[:bsize]
+                sigs = sigs[:bsize]
             # keys
             k = b''
             # Grab the key associated the signature
