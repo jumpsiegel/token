@@ -516,19 +516,19 @@ class PortalCore:
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"verifyVAA", vaa],
             accounts=accts,
-            note = p["digest"],
             sp=sp
         ))
 
-        txns.append(transaction.ApplicationCallTxn(
-            sender=sender.getAddress(),
-            index=appid,
-            on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"governance", vaa],
-            accounts=accts,
-            note = p["digest"],
-            sp=sp
-        ))
+        if "module" in p:  # fix this to correctly detect governance messages
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=appid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"governance", vaa],
+                accounts=accts,
+                note = p["digest"],
+                sp=sp
+            ))
 
         transaction.assign_group_id(txns)
 

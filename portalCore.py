@@ -286,7 +286,7 @@ def getCoreContracts(   client: AlgodClient,
                             Cond(
                                 [a.load() == Bytes("verifySigs"), Seq([
                                     # Lets see if they are actually verifying the correct signatures!
-                                    s.store(Gtxn[i.load()].application_args[1]),
+                                    s.store(Gtxn[i.load()].application_args[1]), # find a different way to get length
                                     Assert(Extract(Txn.application_args[1], off.load(), Len(s.load())) == s.load()),
                                     eoff.store(off.load() + Len(s.load())),
 
