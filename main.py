@@ -582,6 +582,10 @@ class PortalCore:
     def simple_core(self):
         client = self.getAlgodClient()
 
+        attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
+        pprint.pprint(self.parseVAA(attestVAA))
+        sys.exit(0)
+
         print("building our stateless vaa_verify...")
         self.vaa_verify = client.compile(get_vaa_verify())
         self.vaa_verify["lsig"] = LogicSig(base64.b64decode(self.vaa_verify["result"]))
