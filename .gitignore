@@ -2,3 +2,5 @@ _sandbox
 node_modules
 *.teal
 __pycache__
+package.json
+package-lock.json

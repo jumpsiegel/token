@@ -29,6 +29,8 @@ from Cryptodome.Hash import keccak
 
 from algosdk.future.transaction import LogicSig
 
+from token_bridge import get_token_bridge
+
 import pprint
 
 max_keys = 16
@@ -252,6 +254,38 @@ class PortalCore:
         self.tsig = TmplSig("sig")
 
         approval, clear = getCoreContracts(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
+
+        globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
+        localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
+    
+        app_args = [ ]
+    
+        txn = transaction.ApplicationCreateTxn(
+            sender=sender.getAddress(),
+            on_complete=transaction.OnComplete.NoOpOC,
+            approval_program=b64decode(approval["result"]),
+            clear_program=b64decode(clear["result"]),
+            global_schema=globalSchema,
+            local_schema=localSchema,
+            app_args=app_args,
+            sp=client.suggested_params(),
+        )
+    
+        signedTxn = txn.sign(sender.getPrivateKey())
+    
+        client.send_transaction(signedTxn)
+    
+        response = self.waitForTransaction(client, signedTxn.get_txid())
+        assert response.applicationIndex is not None and response.applicationIndex > 0
+
+        return response.applicationIndex
+
+    def createTokenBridgeApp(
+        self,
+        client: AlgodClient,
+        sender: Account,
+    ) -> int:
+        approval, clear = get_token_bridge(client)
 
         globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
@@ -576,6 +610,8 @@ class PortalCore:
         upgradeVAA = bytes.fromhex(open("boot2.vaa", "r").read())
 
         self.submitVAA(upgradeVAA, client, player, appID)
+
+        tokenID = self.createTokenBridgeApp(client, foundation)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
