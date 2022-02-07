@@ -47,3 +47,65 @@ def get_token_bridge(client: AlgodClient) -> Tuple[bytes, bytes]:
     CLEAR_STATE_PROGRAM = fullyCompileContract(client, clear_token_bridge())
 
     return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
+
+# 
+# 
+# 
+# 
+#     @Subroutine(TealType.none)
+#     def axfer(reciever: TealType.bytes, aid: TealType.uint64, amt: TealType.uint64):
+#         return Seq(
+#             InnerTxnBuilder.Begin(),
+#             InnerTxnBuilder.SetFields(
+#                 {
+#                     TxnField.type_enum: TxnType.AssetTransfer,
+#                     TxnField.xfer_asset: aid,
+#                     TxnField.asset_amount: amt,
+#                     TxnField.asset_receiver: reciever,
+#                     TxnField.fee: Int(0),
+#                 }
+#             ),
+#             InnerTxnBuilder.Submit(),
+#         )
+# 
+#     @Subroutine(TealType.none)
+#     def pay(receiver: TealType.bytes, amt: TealType.uint64):
+#         return Seq(
+#             InnerTxnBuilder.Begin(),
+#             InnerTxnBuilder.SetFields(
+#                 {
+#                     TxnField.type_enum: TxnType.Payment,
+#                     TxnField.amount: amt,
+#                     TxnField.receiver: receiver,
+#                     TxnField.fee: Int(0),
+#                 }
+#             ),
+#             InnerTxnBuilder.Submit(),
+#         )
+# 
+#         return Seq(
+#             pool_token_check,
+#             # Make sure we've not already set this
+#             Assert(Not(pool_token_check.hasValue())),
+#             Assert(well_formed_bootstrap),
+#             # Create the pool token
+#             InnerTxnBuilder.Begin(),
+#             InnerTxnBuilder.SetFields(
+#                 {
+#                     TxnField.type_enum: TxnType.AssetConfig,
+#                     TxnField.config_asset_name: Concat(
+#                         Bytes("GovernanceToken-"), itoa(Global.current_application_id())
+#                     ),
+#                     TxnField.config_asset_unit_name: Bytes("algo-gov"),
+#                     TxnField.config_asset_total: Int(total_supply),
+#                     TxnField.config_asset_manager: me,
+#                     TxnField.config_asset_reserve: me,
+#                     TxnField.fee: Int(0),
+#                 }
+#             ),
+#             InnerTxnBuilder.Submit(),
+#             # Write it to global state
+#             App.globalPut(pool_token_key, InnerTxn.created_asset_id()),
+#             Int(1),
+#         )
+# 
