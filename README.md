@@ -384,3 +384,78 @@ Uint8Array(32) [
 
  zh = Buffer.from(z).toString('hex')
 'd669154f19a5dee85b8a62c14f8995d3a80ed0f084209ee79d3d1d7f651aec62'
+
+Dumping VAA, 1411 Bytes
+
+ 0000: Version      | 01                              
+ 0001: Index        | 00000002                        
+ 0005: Siglen       | 13                              
+ 0006: Sig 0        | 00ca5357 2e453649 04c3d0b2 47589651 cbde3bad e55aa730 58b6e5ea d73483be c564b910 ecca1931 46fd6d85 d7d00583 be7363de c7a4a550 a6d0bae8 2470fb0d d100
+ 0072: Sig 1        | 01b12f81 d1a523b0 bfc71294 f8e626e2 72555afa c4d116e5 f29b5a09 502bb754 8135ddc7 32f28d91 5ced0f53 dfcc0b59 377e0e02 cdba2b48 58d87f0a fd14125a 1b00
+ 0138: Sig 2        | 02ffbe01 ec80ad15 ad83d510 cfc1e4ed c492f164 f96f276d 137061b7 588fe1f0 fc5c3f1d c82cc63b 9576584a 77a5c071 a61994c1 e6791062 8482ea2e 5299e5b4 9c01
+ 0204: Sig 3        | 03449ec3 b5496d6f 74ec3e1d cadf4424 efacebb8 90f9f50a ed31c016 eab17d27 d86d598c f6e92777 fc35e73e 72e8a5ac 4f5fdd7a 227c64d3 e8251b4d 8cac9522 1301
+ 0270: Sig 4        | 04be7477 098bccc7 9d0878d3 f8a07e80 f409b0f5 1817e456 2a0d0670 458ea69d b60dc021 89c6ed81 7e3c61fc 06ddaf96 a86c630d a0750ed4 54a05b82 6a2e68d8 6a01
+ 0336: Sig 5        | 05d8081a d9e1cc24 3e042958 d34c0bde 0719f905 4361f60f 29b90ce2 96b48bf6 670246a4 acbf16a0 c680b830 34c72b14 2e1ea8bf a30da0c3 b20094a7 4656b971 fe00
+ 0402: Sig 6        | 063ad6e9 1600b512 59c80c7d f57660d0 66f33749 7d15f5aa fdd4c021 949ac8ea 752ae0d5 5a7b0581 5784091a 4e234292 75ec7515 c4ae2ab4 be1db6bf 5102420a 6001
+ 0468: Sig 7        | 070e89ce 53b3dab9 05083c3b 19b5bc2a c3d48669 2f0447b8 29e4311e b1c90940 332f4ad8 ed036af9 3a1b5593 291447dd 40ec4587 e87fde4b 912c281a 53fab4e4 7c01
+ 0534: Sig 8        | 087ac01a 9c0968c6 c6cf4bed dfa4dfa7 16e3e644 0061025e 9a60ab14 3c3a1452 1e1c87a9 aaee972b d97422bd a4606d8c 900aea90 52aa7cc2 86212b78 518e2133 3e00
+ 0600: Sig 9        | 09310fab 459e3921 d4b81ef6 2df24aea 951b8957 46144bec 13a371cc 5a4dfc06 0b54d350 78b0a0f5 72e994dd fd520b6c 77c5f5b5 d9841145 ca934ba0 81492c09 7d01
+ 0666: Sig 10       | 0a3c7529 0ce231db e93d7b31 7409bb1e 93bb81b1 06cde187 ae9c4114 21d7c7ab ce01ca6a e57df1aa 0367ecf6 c4a65503 8167a7be 410274ff 9b2bec67 3c610f51 8c00
+ 0732: Sig 11       | 0b227304 4546fe81 0aef6b33 ef2b5f4d 383a0870 1d8ee2ec bba332a4 8063b002 ee5b08f9 c7587440 5bcf1629 5aee8f3a 11331553 1ca33c5b 9875d127 b0fa1ef1 c101
+ 0798: Sig 12       | 0c13fc6b 3f9ce2fa 706b09b3 8b5189b5 92ceb00a bf8a5012 767d098a 10fd9452 b22a2a93 e1a38ce9 70adea14 64280e8c 55bf0ad6 e3ddd1e9 b15ce361 4d3a661b 6f01
+ 0864: Sig 13       | 0d713cd3 3ab7a6f9 d4c754bd d30fcf5c 54ef78ca 2380a5f9 c69c5381 00f623e8 6b1a45ee 62642349 62270e50 5e94c9cd 8065fbce da283f68 6e12c8e5 9c6921bb 7c01
+ 0930: Sig 14       | 0eb1c096 a7a2e028 af7de15b 7616620a 5269710d 199cda99 fe646da0 a7ad2721 c617f018 302b1a8a 88b22eee 434bfc56 03d7952d d6b2e76b 9f4af4e0 8d376952 9f01
+ 0996: Sig 15       | 0f5072f9 410becd6 054eab1d f0b76f44 e3316a91 75182c91 f50c3e96 ec8a9cc7 a719ad35 beb41fbb 3ce2c726 0a61e35f 37040ab2 e95cb9c9 d5efa8a2 3d6258b0 7301
+ 1062: Sig 16       | 107c10eb 593c1f49 2757447d 631faaab 99aedefe f4e45c05 e37f23f6 ec4de5cc 2a7c7b18 f4d2971f 37bbe3ce 88891144 006f10b8 7d52b6b4 7e654611 064d2673 4901
+ 1128: Sig 17       | 117f8e5f e4c29b05 4fbb4c77 40f7136a 3ca1b6e2 8609b449 e719dbe1 fd13c499 eb79f9db 09910b1e f102422b c0e90e5a c0f7a4e6 706e4acf 0d615a10 1fd29cae ec01
+ 1194: Sig 18       | 122f6786 31c220b9 9208b761 d38cf399 13040330 c7d468b8 95c8495c ab287de0 6c6c357e b2ce15ad 560eafd8 aa7f5962 f289419e 9cf17b11 6e48327c 1a936918 0700
+ 1260: Timestamp    | 61fea311                        
+ 1264: Nonce        | 00000003                        
+ 1268: Chain        | 0001                            
+ 1270: Emitter      | 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000004
+ 1302: Sequence     | 00000000 00000004               
+ 1310: Consistency  | 14                              
+
+Signers (19):
+
+ 0000 | 0x52a26c... | Unknown Guardian
+ 0001 | 0x389a74... | Unknown Guardian
+ 0002 | 0xb4459e... | Unknown Guardian
+ 0003 | 0x072491... | Unknown Guardian
+ 0004 | 0x51280e... | Unknown Guardian
+ 0005 | 0xfa9aa6... | Unknown Guardian
+ 0006 | 0xe42d59... | Unknown Guardian
+ 0007 | 0x4b07ff... | Unknown Guardian
+ 0008 | 0xc8306b... | Unknown Guardian
+ 0009 | 0xc8c103... | Unknown Guardian
+ 0010 | 0x58a250... | Unknown Guardian
+ 0011 | 0x839082... | Unknown Guardian
+ 0012 | 0x1fd6e9... | Unknown Guardian
+ 0013 | 0x255a41... | Unknown Guardian
+ 0014 | 0xba663b... | Unknown Guardian
+ 0015 | 0x79040e... | Unknown Guardian
+ 0016 | 0x3580d2... | Unknown Guardian
+ 0017 | 0x386979... | Unknown Guardian
+ 0018 | 0x1c0cc5... | Unknown Guardian
+
+Dumping Digest, 151 Bytes
+
+ 0000: Timestamp    | 61fea311                        
+ 0004: Nonce        | 00000003                        
+ 0008: Chain        | 0001                            
+ 0010: Emitter      | 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000004
+ 0042: Sequence     | 00000000 00000004               
+ 0050: Consistency  | 14                              
+ 0051: Payload      | 024523c3 f29447d1 f32aea95 bebd0038 3c4640f1 b4000000 00000000 00000000
+ 0083: Payload      | 00000108 55534443 00000000 00000000 00000000 00000000 00000000 00000000
+ 0115: Payload      | 00000000 43697263 6c65436f 696e0000 00000000 00000000 00000000 00000000
+ 0147: Payload      | 00000000                        
+
+Dumping Payload: TokenBridge Attest, 100 Bytes
+
+ 0000: Type         | 02                              
+ 0001: Address      | 4523c3f2 9447d1f3 2aea95be bd00383c 4640f1b4 00000000 00000000 00000000
+ 0033: Chain        | 0001                            
+ 0035: decimals     | 08                              
+ 0036: Symbol       | 55534443 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 0068: Name         | 43697263 6c65436f 696e0000 00000000 00000000 00000000 00000000 00000000
