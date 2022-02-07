@@ -391,14 +391,14 @@ class PortalCore:
         
         return ret
 
-    def bootGuardians(self, vaa, client, sender, appid):
+    def bootGuardians(self, vaa, client, sender, coreid):
         p = self.parseVAA(vaa)
         if "NewGuardianSetIndex" not in p:
             raise Exception("invalid guardian VAA")
 
-        seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["emitter"].hex())
-        guardian_addr = self.optin(client, sender, appid, p["index"], b"guardian".hex())
-        newguardian_addr = self.optin(client, sender, appid, p["NewGuardianSetIndex"], b"guardian".hex())
+        seq_addr = self.optin(client, sender, coreid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        guardian_addr = self.optin(client, sender, coreid, p["index"], b"guardian".hex())
+        newguardian_addr = self.optin(client, sender, coreid, p["NewGuardianSetIndex"], b"guardian".hex())
 
         # wormhole is not a cheap protocol... we need to buy ourselves
         # some extra CPU cycles by having an early txn do nothing.
@@ -406,7 +406,7 @@ class PortalCore:
 
         txn0 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
-            index=appid,
+            index=coreid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"nop", b"0"],
             sp=client.suggested_params(),
@@ -414,7 +414,7 @@ class PortalCore:
 
         txn1 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
-            index=appid,
+            index=coreid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"nop", b"1"],
             sp=client.suggested_params(),
@@ -422,7 +422,7 @@ class PortalCore:
 
         txn2 = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
-            index=appid,
+            index=coreid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"init", vaa, decode_address(self.vaa_verify["hash"])],
             accounts=[seq_addr, guardian_addr, newguardian_addr],
@@ -440,13 +440,13 @@ class PortalCore:
         #pprint.pprint(response.__dict__)
 
 
-    def lookupGuardians(self, client, sender, appid, index):
-        newguardian_addr = self.optin(client, sender, appid, index, b"guardian".hex(), False)
+    def lookupGuardians(self, client, sender, coreid, index):
+        newguardian_addr = self.optin(client, sender, coreid, index, b"guardian".hex(), False)
 
         app_state = None
         ai = client.account_info(newguardian_addr)
         for app in ai["apps-local-state"]:
-            if app["id"] == appid:
+            if app["id"] == coreid:
                 app_state = app["key-value"]
 
         ret = b''
@@ -467,22 +467,22 @@ class PortalCore:
     # the contract itself and we want to use this to drive the failure test
     # cases
 
-    def submitVAA(self, vaa, client, sender, appid):
+    def submitVAA(self, vaa, client, sender):
         p = self.parseVAA(vaa)
 
         # First we need to opt into the sequence number 
-        seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        seq_addr = self.optin(client, sender, self.coreid, int(p["sequence"] / max_bits), p["emitter"].hex())
         # And then the signatures to help us verify the vaa_s
-        guardian_addr = self.optin(client, sender, appid, p["index"], b"guardian".hex())
+        guardian_addr = self.optin(client, sender, self.coreid, p["index"], b"guardian".hex())
 
         accts = [seq_addr, guardian_addr]
 
         # If this happens to be setting up a new guardian set, we probably need it as well...
         if "NewGuardianSetIndex" in p:
-            newguardian_addr = self.optin(client, sender, appid, p["NewGuardianSetIndex"], b"guardian".hex())
+            newguardian_addr = self.optin(client, sender, self.coreid, p["NewGuardianSetIndex"], b"guardian".hex())
             accts.append(newguardian_addr)
 
-        keys = self.lookupGuardians(client, sender, appid, p["index"])
+        keys = self.lookupGuardians(client, sender, self.coreid, p["index"])
 
         sp = client.suggested_params()
 
@@ -537,7 +537,7 @@ class PortalCore:
 
             txns.append(transaction.ApplicationCallTxn(
                     sender=self.vaa_verify["hash"],
-                    index=appid,
+                    index=self.coreid,
                     on_complete=transaction.OnComplete.NoOpOC,
                     app_args=[b"verifySigs", sigs, kset, digest],
                     accounts=accts,
@@ -546,7 +546,7 @@ class PortalCore:
 
         txns.append(transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
-            index=appid,
+            index=self.coreid,
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"verifyVAA", vaa],
             accounts=accts,
@@ -556,7 +556,7 @@ class PortalCore:
         if "module" in p:  # fix this to correctly detect governance messages
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
-                index=appid,
+                index=self.coreid,
                 on_complete=transaction.OnComplete.NoOpOC,
                 app_args=[b"governance", vaa],
                 accounts=accts,
@@ -594,12 +594,12 @@ class PortalCore:
         print("")
 
         print("Creating the PortalCore app")
-        appID = self.createPortalCoreApp(client=client, sender=foundation)
-        print("appID = " + str(appID))
+        self.coreid = self.createPortalCoreApp(client=client, sender=foundation)
+        print("coreid = " + str(self.coreid))
 
         print("bootstrapping the guardian set...")
         bootVAA = bytes.fromhex(open("boot.vaa", "r").read())
-        self.bootGuardians(bootVAA, client, foundation, appID)
+        self.bootGuardians(bootVAA, client, foundation, self.coreid)
 
         print("grabbing a untrusted account")
         player = self.getTemporaryAccount(client)
@@ -609,7 +609,7 @@ class PortalCore:
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(open("boot2.vaa", "r").read())
 
-        self.submitVAA(upgradeVAA, client, player, appID)
+        self.submitVAA(upgradeVAA, client, player)
 
         tokenID = self.createTokenBridgeApp(client, foundation)
 
