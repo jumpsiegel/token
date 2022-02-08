@@ -37,9 +37,62 @@ def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
 def clear_token_bridge():
     return Int(1)
 
+#            # Create the pool token
+#            InnerTxnBuilder.Begin(),
+#            InnerTxnBuilder.SetFields(
+#                {
+#                    TxnField.type_enum: TxnType.AssetConfig,
+#                    TxnField.config_asset_name: Concat(
+#                        Bytes("GovernanceToken-"), itoa(Global.current_application_id())
+#                    ),
+#                    TxnField.config_asset_unit_name: Bytes("algo-gov"),
+#                    TxnField.config_asset_total: Int(total_supply),
+#                    TxnField.config_asset_manager: me,
+#                    TxnField.config_asset_reserve: me,
+#                    TxnField.fee: Int(0),
+#                }
+#            ),
+#            InnerTxnBuilder.Submit(),
+#            # Write it to global state
+#            App.globalPut(pool_token_key, InnerTxn.created_asset_id()),
+
+
+def attest():
+    return Seq([Approve()])
+
 def approve_token_bridge():
-    return Seq([
-        Approve()]
+    METHOD = Txn.application_args[0]
+
+    on_delete = Seq([Reject()])
+
+    router = Cond(
+        [METHOD == Bytes("attest"), attest()],
+    )
+
+    on_create = Seq( [
+        App.globalPut(Bytes("booted"), Bytes("false")),
+        App.globalPut(Bytes("vphash"), Bytes("")),
+        App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
+        App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
+        Return(Int(1))
+    ])
+
+    on_update = Seq( [
+        Assert(Sha512_256(Concat(Bytes("Program"), Txn.approval_program())) == App.globalGet(Bytes("validUpdateApproveHash"))),
+        Assert(Sha512_256(Concat(Bytes("Program"), Txn.clear_state_program())) == App.globalGet(Bytes("validUpdateClearHash"))),
+        Return(Int(1))
+    ] )
+
+    on_optin = Seq( [
+        Reject()
+    ])
+
+    return Cond(
+        [Txn.application_id() == Int(0), on_create],
+        [Txn.on_completion() == OnComplete.UpdateApplication, on_update],
+        [Txn.on_completion() == OnComplete.DeleteApplication, on_delete],
+        [Txn.on_completion() == OnComplete.OptIn, on_optin],
+        [Txn.on_completion() == OnComplete.NoOp, router]
     )
 
 def get_token_bridge(client: AlgodClient) -> Tuple[bytes, bytes]:

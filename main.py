@@ -379,7 +379,10 @@ class PortalCore:
         ret["consistency"] = int.from_bytes(vaa[off:(off + 1)], "big")
         off += 1
 
+        ret["Meta"] = "Unknown"
+
         if vaa[off:(off + 32)].hex() == "00000000000000000000000000000000000000000000000000000000436f7265":
+            ret["Meta"] = "NewGuardianSetIndex"
             ret["module"] = vaa[off:(off + 32)].hex()
             off += 32
             ret["action"] = int.from_bytes(vaa[off:(off + 1)], "big")
@@ -387,7 +390,20 @@ class PortalCore:
             ret["targetChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
             off += 2
             ret["NewGuardianSetIndex"] = int.from_bytes(vaa[off:(off + 4)], "big")
-            off += 4
+
+        if ((len(vaa[off:])) == 100) and int.from_bytes((vaa[off:off+1]), "big") == 2:
+            ret["Meta"] = "TokenBridge Attest"
+            ret["Type"] = int.from_bytes((vaa[off:off+1]), "big")
+            off += 1
+            ret["Address"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["Chain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+            off += 2
+            ret["Decimals"] = int.from_bytes((vaa[off:off+1]), "big")
+            off += 1
+            ret["Symbol"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["Name"] = vaa[off:(off + 32)].hex()
         
         return ret
 
@@ -478,9 +494,15 @@ class PortalCore:
         accts = [seq_addr, guardian_addr]
 
         # If this happens to be setting up a new guardian set, we probably need it as well...
-        if "NewGuardianSetIndex" in p:
+        if p["Meta"] == "NewGuardianSetIndex":
             newguardian_addr = self.optin(client, sender, self.coreid, p["NewGuardianSetIndex"], b"guardian".hex())
             accts.append(newguardian_addr)
+
+        # When we attest for a new token, we need some place to store the info... later we will need to 
+        # mirror the other way as well
+        if p["Meta"] == "TokenBridge Attest":
+            chain_addr = self.optin(client, sender, self.coreid, p["Chain"], p["Address"])
+            accts.append(chain_addr)
 
         keys = self.lookupGuardians(client, sender, self.coreid, p["index"])
 
@@ -553,7 +575,7 @@ class PortalCore:
             sp=sp
         ))
 
-        if "module" in p:  # fix this to correctly detect governance messages
+        if p["Meta"] == "NewGuardianSetIndex":
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.coreid,
@@ -563,6 +585,17 @@ class PortalCore:
                 note = p["digest"],
                 sp=sp
             ))
+
+        if p["Meta"] == "TokenBridge Attest":
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"attest", vaa],
+                accounts=accts,
+                sp=sp
+            ))
+            
 
         transaction.assign_group_id(txns)
 
@@ -581,10 +614,6 @@ class PortalCore:
 
     def simple_core(self):
         client = self.getAlgodClient()
-
-        attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
-        pprint.pprint(self.parseVAA(attestVAA))
-        sys.exit(0)
 
         print("building our stateless vaa_verify...")
         self.vaa_verify = client.compile(get_vaa_verify())
@@ -615,7 +644,11 @@ class PortalCore:
 
         self.submitVAA(upgradeVAA, client, player)
 
-        tokenID = self.createTokenBridgeApp(client, foundation)
+        self.tokenid = self.createTokenBridgeApp(client, foundation)
+
+        attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
+
+        self.submitVAA(attestVAA, client, player)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
