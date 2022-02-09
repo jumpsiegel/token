@@ -285,7 +285,7 @@ class PortalCore:
         client: AlgodClient,
         sender: Account,
     ) -> int:
-        approval, clear = get_token_bridge(client)
+        approval, clear = get_token_bridge(client, tmpl_sig=self.tsig)
 
         globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
@@ -620,7 +620,8 @@ class PortalCore:
 
         client.send_transactions(grp)
         response = self.waitForTransaction(client, grp[-1].get_txid())
-        pprint.pprint(response.__dict__)
+        if len(response.__dict__["logs"]) > 0:
+            pprint.pprint(response.__dict__["logs"][0].hex())
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
