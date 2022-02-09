@@ -131,8 +131,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
             )),
 
-
-    
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
             off.store(off.load()+Int(43)),
@@ -140,15 +138,16 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Assert(Int(2) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
             Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
     
-            # Has the nice effect of ALSO testing we are looking at the correct object
+            # Has the nice effect of ALSO testing we are looking at the correct object..
             Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
             Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
-            # This pass?!
+            # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
             Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
 
+            # Lets see if we've seen this asset before
             asset.store(blob.read(Int(3), Int(0), Int(8))),
 
             If(asset.load() == Itob(Int(0))).Then(Seq([
