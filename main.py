@@ -12,7 +12,7 @@ import json
 import uvarint
 
 from local_blob import LocalBlob
-from portalCore import getCoreContracts
+from portal_core import getCoreContracts
 from TmplSig import TmplSig
 
 from algosdk.v2client.algod import AlgodClient
