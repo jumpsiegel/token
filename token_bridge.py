@@ -29,6 +29,8 @@ from algosdk.v2client.algod import AlgodClient
 
 from TmplSig import TmplSig
 
+from local_blob import LocalBlob
+
 import sys
 
 def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
@@ -39,120 +41,134 @@ def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
 def clear_token_bridge():
     return Int(1)
 
-@Subroutine(TealType.bytes)
-def extract_value(id) -> Expr:
-    maybe = AssetParam.url(id)
+def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
+    blob = LocalBlob()
 
-    return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
-
-
-@Subroutine(TealType.bytes)
-def encode_uvarint(val: TealType.uint64, b: TealType.bytes):
-    buff = ScratchVar()
-    return Seq(
-        buff.store(b),
-        Concat(
-            buff.load(),
-            If(
-                val >= Int(128),
-                encode_uvarint(
-                    val >> Int(7),
-                    Extract(Itob((val & Int(255)) | Int(128)), Int(7), Int(1)),
+    @Subroutine(TealType.bytes)
+    def extract_value(id) -> Expr:
+        maybe = AssetParam.url(id)
+    
+        return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
+    
+    
+    @Subroutine(TealType.bytes)
+    def encode_uvarint(val: TealType.uint64, b: TealType.bytes):
+        buff = ScratchVar()
+        return Seq(
+            buff.store(b),
+            Concat(
+                buff.load(),
+                If(
+                    val >= Int(128),
+                    encode_uvarint(
+                        val >> Int(7),
+                        Extract(Itob((val & Int(255)) | Int(128)), Int(7), Int(1)),
+                    ),
+                    Extract(Itob(val & Int(255)), Int(7), Int(1)),
                 ),
-                Extract(Itob(val & Int(255)), Int(7), Int(1)),
             ),
-        ),
-    )
-        
-@Subroutine(TealType.bytes)
-def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
-    # We could iterate over N items and encode them for a more general interface
-    # but we inline them directly here
-            
-    return Sha512_256(
-        Concat(
-            Bytes("Program"),
-            # ADDR_IDX aka sequence start
-            tmpl_sig.get_bytecode_chunk(0),
-            encode_uvarint(acct_seq_start, Bytes("")),
-            # EMMITTER_ID
-            tmpl_sig.get_bytecode_chunk(1),
-            encode_uvarint(Len(emitter), Bytes("")),
-            emitter,
-            # SEED_AMT
-            tmpl_sig.get_bytecode_chunk(2),
-            encode_uvarint(Int(seed_amt), Bytes("")),
-            # APP_ID
-            tmpl_sig.get_bytecode_chunk(3),
-            encode_uvarint(Global.current_application_id(), Bytes("")),
-            tmpl_sig.get_bytecode_chunk(4),
         )
-    )
+            
+    @Subroutine(TealType.bytes)
+    def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
+        # We could iterate over N items and encode them for a more general interface
+        # but we inline them directly here
+                
+        return Sha512_256(
+            Concat(
+                Bytes("Program"),
+                # ADDR_IDX aka sequence start
+                tmpl_sig.get_bytecode_chunk(0),
+                encode_uvarint(acct_seq_start, Bytes("")),
+                # EMMITTER_ID
+                tmpl_sig.get_bytecode_chunk(1),
+                encode_uvarint(Len(emitter), Bytes("")),
+                emitter,
+                # SEED_AMT
+                tmpl_sig.get_bytecode_chunk(2),
+                encode_uvarint(Int(seed_amt), Bytes("")),
+                # APP_ID
+                tmpl_sig.get_bytecode_chunk(3),
+                encode_uvarint(Global.current_application_id(), Bytes("")),
+                tmpl_sig.get_bytecode_chunk(4),
+            )
+        )
+    
+    def attest():
+        me = Global.current_application_address()
+        off = ScratchVar()
+    
+        Address = ScratchVar()
+        Chain = ScratchVar()
+        Decimals = ScratchVar()
+        Symbol = ScratchVar()
+        Name = ScratchVar()
+    
+        return Seq([
+            Assert(And(
+                # Lets see if the vaa we are about to process was actually verified by the core
+                Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
+                Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
+                Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index() - Int(2)].application_args[1] == Txn.application_args[1],
 
-def attest():
-    me = Global.current_application_address()
-    off = ScratchVar()
+                # We all opted into the same accounts?
+                Gtxn[Txn.group_index() - Int(2)].accounts[0] == Txn.accounts[0],
+                Gtxn[Txn.group_index() - Int(2)].accounts[1] == Txn.accounts[1],
+                Gtxn[Txn.group_index() - Int(2)].accounts[2] == Txn.accounts[2],
+    
+                # Did the user pay us attest a new product?
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
+                Gtxn[Txn.group_index() - Int(1)].amount() >= Int(200000),
+                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(1)].receiver() == me,
+                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+    
+                (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
+            )),
 
-    Address = ScratchVar()
-    Chain = ScratchVar()
-    Decimals = ScratchVar()
-    Symbol = ScratchVar()
-    Name = ScratchVar()
 
-    return Seq([
-        Assert(And(
-            # Lets see if the vaa we are about to process was actually verified by the core
-            Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
-            Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
-            Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
-            Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
-            Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
-            Gtxn[Txn.group_index() - Int(2)].application_args[1] == Txn.application_args[1],
+    
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
+            Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
+            off.store(off.load()+Int(43)),
+    
+            Assert(Int(2) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
+            Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
+    
+            # Has the nice effect of ALSO testing we are looking at the correct object
+            Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
+            Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
+            Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
+            Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
-            # Did the user pay us attest a new product?
-            Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
-            Gtxn[Txn.group_index() - Int(1)].amount() >= Int(200000),
-            Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
-            Gtxn[Txn.group_index() - Int(1)].receiver() == me,
-            Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+            # This pass?!
+            Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
 
-            (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
-        )),
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.type_enum: TxnType.AssetConfig,
+                    TxnField.config_asset_name: Bytes("hiMom"),
+                    TxnField.config_asset_unit_name: Bytes("algo-gov"),
+                    TxnField.config_asset_total: Int(int(1e17)),
+                    TxnField.config_asset_manager: me,
+                    TxnField.config_asset_freeze: me,
+                    TxnField.config_asset_clawback: me,
+                    TxnField.config_asset_reserve: me,
+                    TxnField.config_asset_url: Bytes("there"),
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
 
-        off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
-        Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
-        off.store(off.load()+Int(43)),
+            Log(Bytes("hi mom")),
+    
+            Approve()
+        ])
 
-        Assert(Int(2) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
-        Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
-
-        # Has the nice effect of ALSO testing we are looking at the correct object
-        Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
-        Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
-        Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
-        Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
-
-        InnerTxnBuilder.Begin(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.AssetConfig,
-                TxnField.config_asset_name: Bytes("hiMom"),
-                TxnField.config_asset_unit_name: Bytes("algo-gov"),
-                TxnField.config_asset_total: Int(int(1e17)),
-                TxnField.config_asset_manager: me,
-                TxnField.config_asset_freeze: me,
-                TxnField.config_asset_clawback: me,
-                TxnField.config_asset_reserve: me,
-                TxnField.config_asset_url: Bytes("there"),
-                TxnField.fee: Int(0),
-            }
-        ),
-        InnerTxnBuilder.Submit(),
-
-        Approve()
-    ])
-
-def approve_token_bridge(tmpl_sig: TmplSig):
     METHOD = Txn.application_args[0]
 
     on_delete = Seq([Reject()])
@@ -174,8 +190,34 @@ def approve_token_bridge(tmpl_sig: TmplSig):
         Return(Int(1))
     ] )
 
+    @Subroutine(TealType.uint64)
+    def optin():
+        # Alias for readability
+        algo_seed = Gtxn[0]
+        optin = Gtxn[1]
+
+        well_formed_optin = And(
+            # Check that we're paying it
+            algo_seed.type_enum() == TxnType.Payment,
+            algo_seed.amount() == Int(seed_amt),
+            # Check that its an opt in to us
+            optin.type_enum() == TxnType.ApplicationCall,
+            optin.on_completion() == OnComplete.OptIn,
+            # Not strictly necessary since we wouldn't be seeing this unless it was us, but...
+            optin.application_id() == Global.current_application_id(),
+        )
+
+        return Seq(
+            # Make sure its a valid optin
+            Assert(well_formed_optin),
+            # Init by writing to the full space available for the sender (Int(0))
+            blob.zero(Int(0)),
+            # we gucci
+            Int(1)
+        )
+
     on_optin = Seq( [
-        Reject()
+        Return(optin())
     ])
 
     return Cond(
@@ -186,8 +228,8 @@ def approve_token_bridge(tmpl_sig: TmplSig):
         [Txn.on_completion() == OnComplete.NoOp, router]
     )
 
-def get_token_bridge(client: AlgodClient, tmpl_sig: TmplSig = None) -> Tuple[bytes, bytes]:
-    APPROVAL_PROGRAM = fullyCompileContract(client, approve_token_bridge(tmpl_sig))
+def get_token_bridge(client: AlgodClient, seed_amt: int = 0, tmpl_sig: TmplSig = None) -> Tuple[bytes, bytes]:
+    APPROVAL_PROGRAM = fullyCompileContract(client, approve_token_bridge(seed_amt, tmpl_sig))
     CLEAR_STATE_PROGRAM = fullyCompileContract(client, clear_token_bridge())
 
     return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM

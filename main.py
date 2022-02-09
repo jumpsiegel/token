@@ -285,7 +285,7 @@ class PortalCore:
         client: AlgodClient,
         sender: Account,
     ) -> int:
-        approval, clear = get_token_bridge(client, tmpl_sig=self.tsig)
+        approval, clear = get_token_bridge(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
 
         globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
@@ -501,7 +501,7 @@ class PortalCore:
         # When we attest for a new token, we need some place to store the info... later we will need to 
         # mirror the other way as well
         if p["Meta"] == "TokenBridge Attest":
-            chain_addr = self.optin(client, sender, self.coreid, p["Chain"], p["Address"])
+            chain_addr = self.optin(client, sender, self.tokenid, p["Chain"], p["Address"])
             accts.append(chain_addr)
 
         keys = self.lookupGuardians(client, sender, self.coreid, p["index"])
