@@ -269,13 +269,67 @@ class GenTest {
       body
     );
   }
+
+//Transfer:
+//
+//PayloadID uint8 = 1
+//   Amount being transferred (big-endian uint256)
+//Amount uint256
+//   Address of the token. Left-zero-padded if shorter than 32 bytes
+//TokenAddress bytes32
+//   Chain ID of the token
+//TokenChain uint16
+//   Address of the recipient. Left-zero-padded if shorter than 32 bytes
+//To bytes32
+//   Chain ID of the recipient
+//ToChain uint16
+//   Amount of tokens (big-endian uint256) that the user is willing to pay as relayer fee. Must be <= Amount.
+//Fee uint256
+
+  genTransfer(signers, guardianSet, nonce, seq, tokenAddress, amt) {
+      let ta = tokenAddress
+      let i = 0;
+      while (i < (32 - (tokenAddress.length/2))) {
+          ta = ta + "00";
+          i += 1;
+      }
+
+    let body = [
+        web3EthAbi.encodeParameter("uint8", 1).substring(64),
+        web3EthAbi.encodeParameter("uint256", parseInt(amt * (100000000))).substring(2 + (64 - 32)),
+
+        ta,
+        web3EthAbi.encodeParameter("uint16", 1).substring(2 + (64 - 4)), // comes from solana
+
+        ta,  // This is the address of receptiant 
+        web3EthAbi.encodeParameter("uint16", 8).substring(2 + (64 - 4)), // comes from solana
+        web3EthAbi.encodeParameter("uint256", parseInt(0)).substring(2 + (64 - 32))
+        ].join("");
+
+
+    const emitter = "0x" + this.zeroPadBytes("", 31) + "04"; // Is the emitter of a guardian upgrade 0?
+
+    return this.createSignedVAA(
+      guardianSet,
+      signers,
+      Math.round(new Date().getTime() / 1000),
+      nonce,
+      1,
+      emitter,
+      seq,
+      20,
+      0,
+      body
+    );
+  }
           
 
   test() {
-//    console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 1, 1, 1));
-//    console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 2, 2, 2));
+//      console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 1, 1, 1));
+//      console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 2, 2, 2));
 //      console.log("./wormhole vaa dump " + this.genAssetMeta(guardianPrivKeys, 2, 3, 4, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
-      console.log(this.genAssetMeta(guardianPrivKeys, 2, 4, 5, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
+//      console.log(this.genAssetMeta(guardianPrivKeys, 2, 4, 5, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
+      console.log(this.genTransfer(guardianPrivKeys, 2, 5, 6, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", 1))
   }
 }
 
