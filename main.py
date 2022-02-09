@@ -455,14 +455,11 @@ class PortalCore:
         response = self.waitForTransaction(client, signedTxn2.get_txid())
         #pprint.pprint(response.__dict__)
 
-
-    def lookupGuardians(self, client, sender, coreid, index):
-        newguardian_addr = self.optin(client, sender, coreid, index, b"guardian".hex(), False)
-
+    def decodeLocalState(self, client, sender, appid, addr):
         app_state = None
-        ai = client.account_info(newguardian_addr)
+        ai = client.account_info(addr)
         for app in ai["apps-local-state"]:
-            if app["id"] == coreid:
+            if app["id"] == appid:
                 app_state = app["key-value"]
 
         ret = b''
@@ -504,7 +501,7 @@ class PortalCore:
             chain_addr = self.optin(client, sender, self.tokenid, p["Chain"], p["Address"])
             accts.append(chain_addr)
 
-        keys = self.lookupGuardians(client, sender, self.coreid, p["index"])
+        keys = self.decodeLocalState(client, sender, self.coreid, guardian_addr)
 
         sp = client.suggested_params()
 
@@ -587,6 +584,15 @@ class PortalCore:
             ))
 
         if p["Meta"] == "TokenBridge Attest":
+            # if we DO decode it, we can do a sanity check... of
+            # course, the hacker might NOT decode it so we have to
+            # handle both cases...
+
+            asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
+            foreign_assets = []
+            if (len(asset) > 8):
+                foreign_assets.append(int.from_bytes(asset[0:8], "big"))
+
             txns.append(
                 transaction.PaymentTxn(
                     sender = sender.getAddress(),
@@ -604,9 +610,9 @@ class PortalCore:
                 on_complete=transaction.OnComplete.NoOpOC,
                 app_args=[b"attest", vaa],
                 accounts=accts,
+                foreign_assets = foreign_assets,
                 sp=sp
             ))
-            
 
         transaction.assign_group_id(txns)
 
@@ -659,12 +665,16 @@ class PortalCore:
 
         self.submitVAA(upgradeVAA, client, player)
 
+        print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
 
+        print("Create a asset")
         attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
-
         self.submitVAA(attestVAA, client, player)
-#        self.submitVAA(attestVAA, client, player)
+
+        print("Create the same asset")
+        attestVAA = bytes.fromhex(open("same_asset.vaa", "r").read())
+        self.submitVAA(attestVAA, client, player)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
