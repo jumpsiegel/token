@@ -664,6 +664,7 @@ class PortalCore:
         attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
 
         self.submitVAA(attestVAA, client, player)
+#        self.submitVAA(attestVAA, client, player)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 

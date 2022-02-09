@@ -175,7 +175,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             asset.store(blob.read(Int(3), Int(0), Int(8))),
 
             If(asset.load() == Itob(Int(0))).Then(Seq([
-                Log(Bytes("never before seen")),
                 InnerTxnBuilder.Begin(),
                 InnerTxnBuilder.SetFields(
                     {
@@ -200,6 +199,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Log(asset.load())   # Pass back the algorand asset id for fun
             ])).Else(Seq([
                 Log(Bytes("This looks familiar")),
+                Log(extract_value(Btoi(asset.load())))
             ])),
     
             Approve()

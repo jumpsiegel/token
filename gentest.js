@@ -274,7 +274,8 @@ class GenTest {
   test() {
 //    console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 1, 1, 1));
 //    console.log("./wormhole vaa dump " + this.genGuardianSetUpgrade(guardianPrivKeys, 1, 2, 2, 2));
-    console.log("./wormhole vaa dump " + this.genAssetMeta(guardianPrivKeys, 2, 3, 4, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
+//      console.log("./wormhole vaa dump " + this.genAssetMeta(guardianPrivKeys, 2, 3, 4, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
+      console.log(this.genAssetMeta(guardianPrivKeys, 2, 4, 5, "4523c3F29447d1f32AEa95BEBD00383c4640F1b4", "USDC", "CircleCoin"))
   }
 }
 
