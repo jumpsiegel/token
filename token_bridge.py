@@ -45,7 +45,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     blob = LocalBlob()
 
     @Subroutine(TealType.bytes)
-    def extract_value(id) -> Expr:
+    def extract_url(id) -> Expr:
         maybe = AssetParam.url(id)
     
         return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
@@ -129,6 +129,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         Name = ScratchVar()
 
         asset = ScratchVar()
+        buf = ScratchVar()
+        c = ScratchVar()
+        a = ScratchVar()
     
         return Seq([
             Assert(And(
@@ -196,10 +199,11 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                 asset.store(Itob(InnerTxn.created_asset_id())),
                 Pop(blob.write(Int(3), Int(0), asset.load())),
-                Log(asset.load())   # Pass back the algorand asset id for fun
             ])).Else(Seq([
-                Log(Bytes("This looks familiar")),
-                Log(extract_value(Btoi(asset.load())))
+                buf.store(extract_url(Btoi(asset.load()))),
+                c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
+                a.store(Extract(buf.load(), Int(8), Int(32))),
+                Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
             ])),
     
             Approve()
