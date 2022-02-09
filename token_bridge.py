@@ -68,7 +68,31 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 ),
             ),
         )
-            
+
+    @Subroutine(TealType.bytes)
+    def trim_bytes(str: TealType.bytes):
+        len = ScratchVar()
+        off = ScratchVar()
+        zero = ScratchVar()
+        r = ScratchVar()
+
+        return Seq([
+            r.store(str),
+
+            len.store(Len(r.load())),
+            zero.store(BytesZero(Int(1))),
+            off.store(Int(0)),
+
+            While(off.load() < len.load()).Do(Seq([
+                If(Extract(r.load(), off.load(), Int(1)) == zero.load()).Then(Seq([
+                        r.store(Extract(r.load(), Int(0), off.load())),
+                        off.store(len.load())
+                ])),
+                off.store(off.load() + Int(1))
+            ])),
+            r.load()
+        ])
+
     @Subroutine(TealType.bytes)
     def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
         # We could iterate over N items and encode them for a more general interface
@@ -151,24 +175,29 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             asset.store(blob.read(Int(3), Int(0), Int(8))),
 
             If(asset.load() == Itob(Int(0))).Then(Seq([
+                Log(Bytes("never before seen")),
                 InnerTxnBuilder.Begin(),
                 InnerTxnBuilder.SetFields(
                     {
                         TxnField.type_enum: TxnType.AssetConfig,
-                        TxnField.config_asset_name: Bytes("hiMom"),
-                        TxnField.config_asset_unit_name: Bytes("algo-gov"),
+                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
+                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
                         TxnField.config_asset_total: Int(int(1e17)),
+                        TxnField.config_asset_decimals: Decimals.load(),
                         TxnField.config_asset_manager: me,
                         TxnField.config_asset_freeze: me,
                         TxnField.config_asset_clawback: me,
                         TxnField.config_asset_reserve: me,
-                        TxnField.config_asset_url: Bytes("there"),
+                        # TODO: It would be really nice if we could do base encoding... can that be done in pyteal?
+                        TxnField.config_asset_url: Concat(Itob(Chain.load()), Address.load()),
                         TxnField.fee: Int(0),
                     }
                 ),
                 InnerTxnBuilder.Submit(),
 
-                asset.store(Itob(InnerTxn.created_asset_id()))
+                asset.store(Itob(InnerTxn.created_asset_id())),
+                Pop(blob.write(Int(3), Int(0), asset.load())),
+                Log(asset.load())   # Pass back the algorand asset id for fun
             ])).Else(Seq([
                 Log(Bytes("This looks familiar")),
             ])),

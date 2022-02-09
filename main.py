@@ -620,8 +620,11 @@ class PortalCore:
 
         client.send_transactions(grp)
         response = self.waitForTransaction(client, grp[-1].get_txid())
-        if len(response.__dict__["logs"]) > 0:
-            pprint.pprint(response.__dict__["logs"][0].hex())
+        if "logs" in response.__dict__:
+            pprint.pprint(response.__dict__["logs"])
+
+#        if len(response.__dict__["logs"]) > 0:
+#            pprint.pprint(response.__dict__["logs"][0].hex())
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
