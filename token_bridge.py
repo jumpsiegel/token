@@ -49,7 +49,7 @@ def attest():
     return Seq([
         Assert(And(
             Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
-            Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
+            Gtxn[Txn.group_index() - Int(2)].application_id() != App.globalGet(Bytes("coreid")),
             Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
             Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
             Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
