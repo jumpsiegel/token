@@ -103,6 +103,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         Decimals = ScratchVar()
         Symbol = ScratchVar()
         Name = ScratchVar()
+
+        asset = ScratchVar()
     
         return Seq([
             Assert(And(
@@ -147,24 +149,30 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # This pass?!
             Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
 
-            InnerTxnBuilder.Begin(),
-            InnerTxnBuilder.SetFields(
-                {
-                    TxnField.type_enum: TxnType.AssetConfig,
-                    TxnField.config_asset_name: Bytes("hiMom"),
-                    TxnField.config_asset_unit_name: Bytes("algo-gov"),
-                    TxnField.config_asset_total: Int(int(1e17)),
-                    TxnField.config_asset_manager: me,
-                    TxnField.config_asset_freeze: me,
-                    TxnField.config_asset_clawback: me,
-                    TxnField.config_asset_reserve: me,
-                    TxnField.config_asset_url: Bytes("there"),
-                    TxnField.fee: Int(0),
-                }
-            ),
-            InnerTxnBuilder.Submit(),
+            asset.store(blob.read(Int(3), Int(0), Int(8))),
 
-            Log(Bytes("hi mom")),
+            If(asset.load() == Itob(Int(0))).Then(Seq([
+                InnerTxnBuilder.Begin(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetConfig,
+                        TxnField.config_asset_name: Bytes("hiMom"),
+                        TxnField.config_asset_unit_name: Bytes("algo-gov"),
+                        TxnField.config_asset_total: Int(int(1e17)),
+                        TxnField.config_asset_manager: me,
+                        TxnField.config_asset_freeze: me,
+                        TxnField.config_asset_clawback: me,
+                        TxnField.config_asset_reserve: me,
+                        TxnField.config_asset_url: Bytes("there"),
+                        TxnField.fee: Int(0),
+                    }
+                ),
+                InnerTxnBuilder.Submit(),
+
+                asset.store(Itob(InnerTxn.created_asset_id()))
+            ])).Else(Seq([
+                Log(Bytes("This looks familiar")),
+            ])),
     
             Approve()
         ])
