@@ -296,16 +296,15 @@ class GenTest {
 
     let body = [
         web3EthAbi.encodeParameter("uint8", 1).substring(64),
-        web3EthAbi.encodeParameter("uint256", parseInt(amt * (100000000))).substring(2 + (64 - 32)),
-
+        web3EthAbi.encodeParameter("uint256", parseInt(amt * (100000000))).substring(2),
         ta,
         web3EthAbi.encodeParameter("uint16", 1).substring(2 + (64 - 4)), // comes from solana
-
         ta,  // This is the address of receptiant 
         web3EthAbi.encodeParameter("uint16", 8).substring(2 + (64 - 4)), // comes from solana
-        web3EthAbi.encodeParameter("uint256", parseInt(0)).substring(2 + (64 - 32))
+        web3EthAbi.encodeParameter("uint256", parseInt(0)).substring(2)
         ].join("");
 
+    console.log(body.length)
 
     const emitter = "0x" + this.zeroPadBytes("", 31) + "04"; // Is the emitter of a guardian upgrade 0?
 
