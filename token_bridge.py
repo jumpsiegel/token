@@ -37,28 +37,53 @@ def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
 def clear_token_bridge():
     return Int(1)
 
-#            # Create the pool token
-#            InnerTxnBuilder.Begin(),
-#            InnerTxnBuilder.SetFields(
-#                {
-#                    TxnField.type_enum: TxnType.AssetConfig,
-#                    TxnField.config_asset_name: Concat(
-#                        Bytes("GovernanceToken-"), itoa(Global.current_application_id())
-#                    ),
-#                    TxnField.config_asset_unit_name: Bytes("algo-gov"),
-#                    TxnField.config_asset_total: Int(total_supply),
-#                    TxnField.config_asset_manager: me,
-#                    TxnField.config_asset_reserve: me,
-#                    TxnField.fee: Int(0),
-#                }
-#            ),
-#            InnerTxnBuilder.Submit(),
-#            # Write it to global state
-#            App.globalPut(pool_token_key, InnerTxn.created_asset_id()),
+@Subroutine(TealType.bytes)
+def extract_value(id) -> Expr:
+    maybe = AssetParam.url(id)
 
+    return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
 
 def attest():
-    return Seq([Approve()])
+    me = Global.current_application_address()
+
+    return Seq([
+        Assert(And(
+            Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
+            Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
+            Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
+            Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
+            Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
+
+            Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
+            Gtxn[Txn.group_index() - Int(1)].amount() >= Int(200000),
+#            Gtxn[Txn.group_index() - Int(1)].receiver() == Global.current_application_id(),
+            Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+
+            (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
+        )),
+
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.AssetConfig,
+                TxnField.config_asset_name: Bytes("hiMom"),
+                TxnField.config_asset_unit_name: Bytes("algo-gov"),
+                TxnField.config_asset_total: Int(int(1e17)),
+                TxnField.config_asset_manager: me,
+                TxnField.config_asset_freeze: me,
+                TxnField.config_asset_clawback: me,
+                TxnField.config_asset_reserve: me,
+                TxnField.config_asset_url: Bytes("there"),
+                TxnField.fee: Int(0),
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+        # Write it to global state
+
+        #Log(extract_value(InnerTxn.created_asset_id())),
+
+        Approve()
+    ])
 
 def approve_token_bridge():
     METHOD = Txn.application_args[0]
@@ -70,8 +95,7 @@ def approve_token_bridge():
     )
 
     on_create = Seq( [
-        App.globalPut(Bytes("booted"), Bytes("false")),
-        App.globalPut(Bytes("vphash"), Bytes("")),
+        App.globalPut(Bytes("coreid"), Btoi(Txn.application_args[0])),
         App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
         App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
         Return(Int(1))

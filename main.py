@@ -290,7 +290,7 @@ class PortalCore:
         globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
-        app_args = [ ]
+        app_args = [self.coreid]
     
         txn = transaction.ApplicationCreateTxn(
             sender=sender.getAddress(),
@@ -587,6 +587,17 @@ class PortalCore:
             ))
 
         if p["Meta"] == "TokenBridge Attest":
+            txns.append(
+                transaction.PaymentTxn(
+                    sender = sender.getAddress(),
+                    sp = sp, 
+                    receiver = get_application_address(self.tokenid),
+                    amt = 200000
+                )
+            )
+
+            sp.fee = sp.min_fee * 2  # pay for the txn on behalf of app
+
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.tokenid,
@@ -608,7 +619,7 @@ class PortalCore:
                 grp.append(t.sign(pk))
 
         client.send_transactions(grp)
-        response = self.waitForTransaction(client, grp[-2].get_txid())
+        response = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(response.__dict__)
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
