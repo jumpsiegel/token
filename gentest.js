@@ -272,19 +272,13 @@ class GenTest {
 
 //Transfer:
 //
-//PayloadID uint8 = 1
-//   Amount being transferred (big-endian uint256)
-//Amount uint256
-//   Address of the token. Left-zero-padded if shorter than 32 bytes
-//TokenAddress bytes32
-//   Chain ID of the token
-//TokenChain uint16
-//   Address of the recipient. Left-zero-padded if shorter than 32 bytes
-//To bytes32
-//   Chain ID of the recipient
-//ToChain uint16
-//   Amount of tokens (big-endian uint256) that the user is willing to pay as relayer fee. Must be <= Amount.
-//Fee uint256
+//   PayloadID uint8 = 1
+//   Amount being transferred (big-endian uint256) //Amount uint256
+//   Address of the token. Left-zero-padded if shorter than 32 bytes //TokenAddress bytes32
+//   Chain ID of the token //TokenChain uint16
+//   Address of the recipient. Left-zero-padded if shorter than 32 bytes //To bytes32
+//   Chain ID of the recipient //ToChain uint16
+//   Amount of tokens (big-endian uint256) that the user is willing to pay as relayer fee. Must be <= Amount. //Fee uint256
 
   genTransfer(signers, guardianSet, nonce, seq, tokenAddress, amt) {
       let ta = tokenAddress

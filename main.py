@@ -404,6 +404,21 @@ class PortalCore:
             ret["Symbol"] = vaa[off:(off + 32)].hex()
             off += 32
             ret["Name"] = vaa[off:(off + 32)].hex()
+
+        if ((len(vaa[off:])) == 133) and int.from_bytes((vaa[off:off+1]), "big") == 1:
+            ret["Meta"] = "TokenBridge Transfer"
+            off += 1
+            ret["Amount"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["Contract"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["FromChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+            off += 2
+            ret["ToAddress"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["ToChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+            off += 2
+            ret["Fee"] = vaa[off:(off + 32)].hex()
         
         return ret
 
@@ -634,6 +649,11 @@ class PortalCore:
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
+        t = bytes.fromhex(open("transfer.vaa", "r").read())
+        pprint.pprint(self.parseVAA(t))
+
+        sys.exit(0)
+
         client = self.getAlgodClient()
 
         print("building our stateless vaa_verify...")
