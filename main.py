@@ -1,4 +1,4 @@
-# python3 -m pip install pycryptodomex uvarint pyteal web3 ecdsa
+# python3 -m pip install pycryptodomex uvarint pyteal web3 coincurve
 
 from time import time, sleep
 from typing import List, Tuple, Dict, Any, Optional, Union
@@ -10,7 +10,7 @@ import uuid
 import sys
 import json
 import uvarint
-
+from gentest import GenTest
 from local_blob import LocalBlob
 from portal_core import getCoreContracts
 from TmplSig import TmplSig
@@ -649,6 +649,10 @@ class PortalCore:
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
+#        q = bytes.fromhex(open("t.vaa", "r").read())
+#        pprint.pprint(self.parseVAA(q))
+#        sys.exit(0)
+
         client = self.getAlgodClient()
 
         print("building our stateless vaa_verify...")
@@ -666,8 +670,10 @@ class PortalCore:
         self.coreid = self.createPortalCoreApp(client=client, sender=foundation)
         print("coreid = " + str(self.coreid))
 
+        gt = GenTest()
+
         print("bootstrapping the guardian set...")
-        bootVAA = bytes.fromhex(open("boot.vaa", "r").read())
+        bootVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, 1, 1, 1))
         self.bootGuardians(bootVAA, client, foundation, self.coreid)
 
         print("grabbing a untrusted account")

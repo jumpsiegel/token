@@ -68,15 +68,15 @@ class GenTest:
             return encode_single(type, val).hex()[64-(64):64]
         raise Exception("you suck")
 
-    def createSignedVAA(self, guardianSetIndex, signers, timestamp, nonce, emitterChainId, emitterAddress, sequence, consistencyLevel, target, payload):
+    def createSignedVAA(self, guardianSetIndex, signers, ts, nonce, emitterChainId, emitterAddress, sequence, consistencyLevel, target, payload):
         b = ""
 
-        b += self.encoder("uint32", timestamp),
-        b += self.encoder("uint32", nonce),
-        b += self.encoder("uint16", emitterChainId),
-        b += self.encoder("bytes32", emitterAddress),
-        b += self.encoder("uint64", sequence),
-        b += self.encoder("uint8", consistencyLevel),
+        b += self.encoder("uint32", ts)
+        b += self.encoder("uint32", nonce)
+        b += self.encoder("uint16", emitterChainId)
+        b += self.encoder("bytes32", emitterAddress)
+        b += self.encoder("uint64", sequence)
+        b += self.encoder("uint8", consistencyLevel)
         b += payload
 
         hash = keccak.new(digest_bits=256).update(keccak.new(digest_bits=256).update(bytes.fromhex(b)).digest()).digest()
@@ -84,16 +84,16 @@ class GenTest:
         signatures = ""
 
         for  i in range(len(signers)):
-            key = coincurve.PrivateKey(bytes.fromhex(bytes.fromhex(signers[i])))
-            signature = key.sign_recoverable(hash, hasher=None)
-
             signatures += self.encoder("uint8", i)
+
+            key = coincurve.PrivateKey(bytes.fromhex(signers[i]))
+            signature = key.sign_recoverable(hash, hasher=None)
             signatures += signature.hex()
 
         ret  = self.encoder("uint8", 1)
         ret += self.encoder("uint32", guardianSetIndex)
         ret += self.encoder("uint8", len(signers))
-        ret += signatures,
+        ret += signatures
         ret += b
 
         return ret
@@ -114,9 +114,7 @@ class GenTest:
 
         emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
     
-        return self.createSignedVAA(
-          guardianSet, signers, int(time.time()), nonce,
-          1, emitter, seq, 0, 0, b)
+        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 0, 0, b)
 
     def test(self):
         print(self.genGuardianSetUpgrade(self.guardianPrivKeys, 1, 1, 1, 1))
@@ -124,4 +122,3 @@ class GenTest:
 if __name__ == '__main__':    
     core = GenTest()
     core.test()
-
