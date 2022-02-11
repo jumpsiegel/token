@@ -1,6 +1,9 @@
 from eth_abi import encode_single, encode_abi
 import sys
 import pprint
+import time
+from Cryptodome.Hash import keccak
+import coincurve
 
 class GenTest:
     def __init__(self) -> None:
@@ -66,93 +69,57 @@ class GenTest:
         raise Exception("you suck")
 
     def createSignedVAA(self, guardianSetIndex, signers, timestamp, nonce, emitterChainId, emitterAddress, sequence, consistencyLevel, target, payload):
-        body = [
-          self.encoder("uint32", timestamp),
-          self.encoder("uint32", nonce),
-          self.encoder("uint16", emitterChainId),
-          self.encoder("bytes32", emitterAddress),
-          self.encoder("uint64", sequence),
-          self.encoder("uint8", consistencyLevel),
-          payload
-        ]
+        b = ""
 
-        pprint.pprint(body)
-        sys.exit(0)
-    
-        const hash = web3Utils.keccak256(web3Utils.keccak256("0x" + body.join("")));
-    
-        // console.log('VAA body Hash: ', hash)
-    
-        let signatures = "";
-    
-        for (const i in signers) {
-          // eslint-disable-next-line new-cap
-          const ec = new elliptic.ec("secp256k1");
-          const key = ec.keyFromPrivate(signers[i]);
-          const signature = key.sign(hash.substr(2), { canonical: true });
-    
-          const packSig = [
-            self.encoder("uint8", i).substring(2 + (64 - 2)),
-            this.zeroPadBytes(signature.r.toString(16), 32),
-            this.zeroPadBytes(signature.s.toString(16), 32),
-            web3EthAbi
-              .encodeParameter("uint8", signature.recoveryParam)
-              .substr(2 + (64 - 2)),
-          ];
-    
-          signatures += packSig.join("");
-        }
-    
-        const vm = [
-          self.encoder("uint8", 1).substring(2 + (64 - 2)),
-          self.encoder("uint32", guardianSetIndex) .substring(2 + (64 - 8)),
-          self.encoder("uint8", signers.length) .substring(2 + (64 - 2)),
-    
-          signatures,
-          body.join(""),
-        ].join("");
-    
-        return vm;
+        b += self.encoder("uint32", timestamp),
+        b += self.encoder("uint32", nonce),
+        b += self.encoder("uint16", emitterChainId),
+        b += self.encoder("bytes32", emitterAddress),
+        b += self.encoder("uint64", sequence),
+        b += self.encoder("uint8", consistencyLevel),
+        b += payload
 
+        hash = keccak.new(digest_bits=256).update(keccak.new(digest_bits=256).update(bytes.fromhex(b)).digest()).digest()
+
+        signatures = ""
+
+        for  i in range(len(signers)):
+            key = coincurve.PrivateKey(bytes.fromhex(bytes.fromhex(signers[i])))
+            signature = key.sign_recoverable(hash, hasher=None)
+
+            signatures += self.encoder("uint8", i)
+            signatures += signature.hex()
+
+        ret  = self.encoder("uint8", 1)
+        ret += self.encoder("uint32", guardianSetIndex)
+        ret += self.encoder("uint8", len(signers))
+        ret += signatures,
+        ret += b
+
+        return ret
 
     def genGuardianSetUpgrade(self, signers, guardianSet, targetSet, nonce, seq):
-        body = [
-          this.zeroPadBytes("", 28),
-          self.encoder("uint8", ord("C")),
-          self.encoder("uint8", ord("o")),
-          self.encoder("uint8", ord("r")),
-          self.encoder("uint8", ord("e")),
-          self.encoder("uint8", 2),
-          self.encoder("uint16", 0),
-          self.encoder("uint32", targetSet),
-          self.encoder("uint8", guardianKeys.length)
-        ]
+        b  = self.zeroPadBytes[0:(28*2)]
+        b += self.encoder("uint8", ord("C"))
+        b += self.encoder("uint8", ord("o"))
+        b += self.encoder("uint8", ord("r"))
+        b += self.encoder("uint8", ord("e"))
+        b += self.encoder("uint8", 2)
+        b += self.encoder("uint16", 0)
+        b += self.encoder("uint32", targetSet)
+        b += self.encoder("uint8", len(self.guardianKeys))
 
-        pprint.pprint(body)
-        sys.exit(0)
+        for i in self.guardianKeys:
+            b += i
+
+        emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
     
-        for (const i in guardianKeys) {
-          body += guardianKeys[i];
-        }
-    
-        const emitter = "0x" + this.zeroPadBytes("", 31) + "04"; // Is the emitter of a guardian upgrade 0?
-    
-        return this.createSignedVAA(
-          guardianSet,
-          signers,
-          Math.round(new Date().getTime() / 1000),
-          nonce,
-          1,
-          emitter,
-          seq,
-          0,
-          0,
-          body
-        );
-      }
+        return self.createSignedVAA(
+          guardianSet, signers, int(time.time()), nonce,
+          1, emitter, seq, 0, 0, b)
 
     def test(self):
-        print(self.encoder('uint8', 1))
+        print(self.genGuardianSetUpgrade(self.guardianPrivKeys, 1, 1, 1, 1))
 
 if __name__ == '__main__':    
     core = GenTest()

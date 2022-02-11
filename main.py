@@ -1,4 +1,4 @@
-# python3 -m pip install pycryptodomex uvarint pyteal web3
+# python3 -m pip install pycryptodomex uvarint pyteal web3 ecdsa
 
 from time import time, sleep
 from typing import List, Tuple, Dict, Any, Optional, Union
