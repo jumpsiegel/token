@@ -649,11 +649,6 @@ class PortalCore:
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
-        t = bytes.fromhex(open("transfer.vaa", "r").read())
-        pprint.pprint(self.parseVAA(t))
-
-        sys.exit(0)
-
         client = self.getAlgodClient()
 
         print("building our stateless vaa_verify...")
