@@ -161,7 +161,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
-            #Assert(App.globalGet(Concat("Chain", Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
+            #Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
             off.store(off.load()+Int(43)),
 
