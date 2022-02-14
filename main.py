@@ -84,7 +84,7 @@ class PortalCore:
     def __init__(self) -> None:
         self.ALGOD_ADDRESS = "http://localhost:4001"
         self.ALGOD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        self.FUNDING_AMOUNT = 100_000_000
+        self.FUNDING_AMOUNT = 100_000_000_000
 
         self.KMD_ADDRESS = "http://localhost:4002"
         self.KMD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -155,7 +155,7 @@ class PortalCore:
     
     def getTemporaryAccount(self, client: AlgodClient) -> Account:
         if len(self.accountList) == 0:
-            sks = [account.generate_account()[0] for i in range(3)]
+            sks = [account.generate_account()[0] for i in range(2)]
             self.accountList = [Account(sk) for sk in sks]
     
             genesisAccounts = self.getGenesisAccounts()
@@ -340,6 +340,8 @@ class PortalCore:
 
         if sig_addr not in self.cache and not self.account_exists(client, app_id, sig_addr):
             if doCreate:
+                print("Creating " + sig_addr)
+
                 # Create it
                 sp = client.suggested_params()
     
@@ -736,17 +738,19 @@ class PortalCore:
             seq += 1
 
         print("Create a asset")
-        print(seq)
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
-        # I have to recreate the whole object with a new sequence number
-        print("Create the same asset")
-        print(seq)
-        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
-        self.submitVAA(attestVAA, client, player)
-        seq += 1
+        for r in range(1, 50000):
+            bal = self.getBalances(client, player.getAddress())
+            pprint.pprint(bal)
+
+            # I have to recreate the whole object with a new sequence number
+            print("Create the same asset " + str(seq))
+            attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
+            self.submitVAA(attestVAA, client, player)
+            seq += 1
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
