@@ -255,7 +255,7 @@ class PortalCore:
 
         approval, clear = getCoreContracts(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
 
-        globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
+        globalSchema = transaction.StateSchema(num_uints=8, num_byte_slices=16)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
         app_args = [ ]
@@ -267,6 +267,7 @@ class PortalCore:
             clear_program=b64decode(clear["result"]),
             global_schema=globalSchema,
             local_schema=localSchema,
+            extra_pages = 1,
             app_args=app_args,
             sp=client.suggested_params(),
         )

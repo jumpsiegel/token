@@ -207,10 +207,13 @@ def getCoreContracts(   client: AlgodClient,
                 off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
                 emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
                 sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
+
+                # They passed us the correct account?  In this case, byte_offset points at the whole block
                 byte_offset.store(sequence.load() / Int(max_bits)),
-                # They passed us the correct account?
                 Assert(Txn.accounts[1] == get_sig_address(byte_offset.load(), emitter.load())),
+
                 # Now, lets go grab the raw byte
+                byte_offset.store((sequence.load() / Int(8)) % Int(max_bytes)),
                 b.store(blob.get_byte(Int(1), byte_offset.load())),
 
                 # I would hope we've never seen this packet before...   throw an exception if we have
