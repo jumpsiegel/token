@@ -163,15 +163,14 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             Cond( 
                 [a.load() == Int(1), Seq([
-                    targetChain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
-                    off.store(off.load() + Int(1)),
-
+                    targetChain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
                     # can we really register a chain JUST for our chain?
                     Assert(Or((targetChain.load() == Int(0)), (targetChain.load() == Int(8)))),
 
-                    chain.store(Extract(Txn.application_args[1], off.load(), Int(2))),
                     off.store(off.load() + Int(2)),
+                    chain.store(Extract(Txn.application_args[1], off.load(), Int(2))),
 
+                    off.store(off.load() + Int(2)),
                     emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
 
                     App.globalPut(Concat(Bytes("Chain"), chain.load()), emitter.load()),
@@ -229,7 +228,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
-            #Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
+#            Log(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))),
+#            Log(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2))))),
+#            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
             off.store(off.load()+Int(43)),
 

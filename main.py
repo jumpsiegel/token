@@ -288,7 +288,7 @@ class PortalCore:
     ) -> int:
         approval, clear = get_token_bridge(client, seed_amt=self.seed_amt, tmpl_sig=self.tsig)
 
-        globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=4)
+        globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=30)
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
         app_args = [self.coreid]
@@ -752,6 +752,10 @@ class PortalCore:
             vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 2, seq, seq, r))
             self.submitVAA(vaa, client, player)
             seq += 1
+
+#            pprint.pprint(self.parseVAA(vaa))
+#            print(vaa.hex())
+#            sys.exit(0)
 
             bal = self.getBalances(client, player.getAddress())
             pprint.pprint(bal)
