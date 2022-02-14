@@ -325,9 +325,24 @@ def getCoreContracts(   client: AlgodClient,
         def governance():
             return Seq([
                 Assert(And(
+                    Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
                     Gtxn[Txn.group_index() - Int(1)].application_id() == Txn.application_id(),
                     Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("verifyVAA"),
                     Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                    Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+
+                    # Lets see if the vaa we are about to process was actually verified by the core
+                    Gtxn[Txn.group_index() - Int(1)].application_args[1] == Txn.application_args[1],
+
+                    # What checks should I give myself
+                    Gtxn[Txn.group_index()].rekey_to() == Global.zero_address(),
+                    Gtxn[Txn.group_index()].sender() == Txn.sender(),
+
+                    # We all opted into the same accounts?
+                    Gtxn[Txn.group_index() - Int(1)].accounts[0] == Txn.accounts[0],
+                    Gtxn[Txn.group_index() - Int(1)].accounts[1] == Txn.accounts[1],
+                    Gtxn[Txn.group_index() - Int(1)].accounts[2] == Txn.accounts[2],
+
                     (Global.group_size() - Int(1)) == Txn.group_index()    # governance should be the last entry...
                 )),
                     

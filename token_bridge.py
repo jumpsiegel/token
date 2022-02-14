@@ -117,6 +117,59 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 tmpl_sig.get_bytecode_chunk(4),
             )
         )
+
+    def governance():
+        off = ScratchVar()
+        a = ScratchVar()
+    
+        return Seq([
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
+
+            Assert(And(
+                # Did verifyVAA pass?
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(1)].application_id() == App.globalGet(Bytes("coreid")),
+                Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("verifyVAA"),
+                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+
+                # Lets see if the vaa we are about to process was actually verified by the core
+                Gtxn[Txn.group_index() - Int(1)].application_args[1] == Txn.application_args[1],
+
+                # What checks should I give myself
+                Gtxn[Txn.group_index()].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index()].sender() == Txn.sender(),
+
+                # We all opted into the same accounts?
+                Gtxn[Txn.group_index() - Int(1)].accounts[0] == Txn.accounts[0],
+                Gtxn[Txn.group_index() - Int(1)].accounts[1] == Txn.accounts[1],
+                Gtxn[Txn.group_index() - Int(1)].accounts[2] == Txn.accounts[2],
+
+                # Better be the right emitters
+                Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0001"),
+                Extract(Txn.application_args[1], off.load() + Int(2), Int(32)) == Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000004"),
+    
+                (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
+            )),
+
+            off.store(off.load() + Int(43)),
+            Assert(Extract(Txn.application_args[1], off.load(), Int(32)) == Bytes("base16", "000000000000000000000000000000000000000000546f6b656e427269646765")),
+            off.store(off.load() + Int(32)),
+            a.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+
+            Cond( 
+                [a.load() == Int(1), Seq([
+                    Log(Bytes("RegisterChain"))
+                ])],
+                [a.load() == Int(2), Seq([
+                    Log(Bytes("UpgradeContract"))
+                ])]
+            ),
+
+
+            Log(Bytes("hi mom")),
+            Approve()
+        ])
     
     def attest():
         me = Global.current_application_address()
@@ -218,6 +271,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
     router = Cond(
         [METHOD == Bytes("attest"), attest()],
+        [METHOD == Bytes("governance"), governance()],
     )
 
     on_create = Seq( [
