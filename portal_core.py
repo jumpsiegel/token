@@ -125,6 +125,7 @@ def getCoreContracts(   client: AlgodClient,
             idx = ScratchVar()
             set = ScratchVar()
             len = ScratchVar()
+            v = ScratchVar()
 
             return Seq([
                 # All governance must be done with the most recent guardian set
@@ -165,13 +166,14 @@ def getCoreContracts(   client: AlgodClient,
 
                         # move off to point at the NewGuardianSetIndex and grab it
                         off.store(off.load() + Int(3)),
-                        idx.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(4)))),
+                        v.store(Extract(Txn.application_args[1], off.load(), Int(4))),
+                        idx.store(Btoi(v.load())),
 
                         # Lets see if the user handed us the correct memory... no hacky hacky
                         Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
 
                         # Write this away till the next time
-                        App.globalPut(Bytes("currentGuardianSetIndex"), Extract(Txn.application_args[1], off.load(), Int(4))),
+                        App.globalPut(Bytes("currentGuardianSetIndex"), v.load()),
 
                         # Write everything out to the auxilliary storage
                         off.store(off.load() + Int(4)),
@@ -219,6 +221,7 @@ def getCoreContracts(   client: AlgodClient,
                 Assert(Btoi(Extract(Txn.application_args[1], Int(0), Int(1))) == Int(1)),
 
                 off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
+
                 emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
                 sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
 
