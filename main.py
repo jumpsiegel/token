@@ -373,6 +373,7 @@ class PortalCore:
         off += 4
         ret["nonce"] = int.from_bytes(vaa[off:(off + 4)], "big")
         off += 4
+        ret["chainRaw"] = vaa[off:(off + 2)]
         ret["chain"] = int.from_bytes(vaa[off:(off + 2)], "big")
         off += 2
         ret["emitter"] = vaa[off:(off + 32)]
@@ -451,7 +452,7 @@ class PortalCore:
         if "NewGuardianSetIndex" not in p:
             raise Exception("invalid guardian VAA")
 
-        seq_addr = self.optin(client, sender, coreid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        seq_addr = self.optin(client, sender, coreid, int(p["sequence"] / max_bits), p["chainRaw"].hex() + p["emitter"].hex())
         guardian_addr = self.optin(client, sender, coreid, p["index"], b"guardian".hex())
         newguardian_addr = self.optin(client, sender, coreid, p["NewGuardianSetIndex"], b"guardian".hex())
 
@@ -524,7 +525,7 @@ class PortalCore:
         p = self.parseVAA(vaa)
 
         # First we need to opt into the sequence number 
-        seq_addr = self.optin(client, sender, self.coreid, int(p["sequence"] / max_bits), p["emitter"].hex())
+        seq_addr = self.optin(client, sender, self.coreid, int(p["sequence"] / max_bits), p["chainRaw"].hex() + p["emitter"].hex())
         # And then the signatures to help us verify the vaa_s
         guardian_addr = self.optin(client, sender, self.coreid, p["index"], b"guardian".hex())
 

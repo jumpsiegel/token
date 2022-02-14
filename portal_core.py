@@ -220,10 +220,10 @@ def getCoreContracts(   client: AlgodClient,
             return Seq(
                 Assert(Btoi(Extract(Txn.application_args[1], Int(0), Int(1))) == Int(1)),
 
-                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
+                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the emitter
 
-                emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
-                sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
+                emitter.store(Extract(Txn.application_args[1], off.load(), Int(34))),
+                sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(34), Int(8)))),
 
                 # They passed us the correct account?  In this case, byte_offset points at the whole block
                 byte_offset.store(sequence.load() / Int(max_bits)),
