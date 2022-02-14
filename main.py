@@ -727,13 +727,11 @@ class PortalCore:
         print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
 
-        for r in range(1, 5):
+        for r in range(1, 6):
+            print("Registering chain " + str(r))
             vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 1, 2, seq, seq, r))
             self.submitVAA(vaa, client, player)
-            sys.exit(0)
             seq += 1
-
-        sys.exit(0)
 
         print("Create a asset")
         attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())

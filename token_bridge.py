@@ -121,6 +121,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     def governance():
         off = ScratchVar()
         a = ScratchVar()
+        targetChain = ScratchVar()
+        chain = ScratchVar()
+        emitter = ScratchVar()
     
         return Seq([
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
@@ -156,18 +159,30 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Assert(Extract(Txn.application_args[1], off.load(), Int(32)) == Bytes("base16", "000000000000000000000000000000000000000000546f6b656e427269646765")),
             off.store(off.load() + Int(32)),
             a.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+            off.store(off.load() + Int(1)),
 
             Cond( 
                 [a.load() == Int(1), Seq([
-                    Log(Bytes("RegisterChain"))
+                    targetChain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
+                    off.store(off.load() + Int(1)),
+
+                    # can we really register a chain JUST for our chain?
+                    Assert(Or((targetChain.load() == Int(0)), (targetChain.load() == Int(8)))),
+
+                    chain.store(Extract(Txn.application_args[1], off.load(), Int(2))),
+                    off.store(off.load() + Int(2)),
+
+                    emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
+
+                    App.globalPut(Concat(Bytes("Chain"), chain.load()), emitter.load()),
                 ])],
                 [a.load() == Int(2), Seq([
-                    Log(Bytes("UpgradeContract"))
+                    Assert(Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0008")),
+                    off.store(off.load() + Int(2)),
+                    App.globalPut(Bytes("validUpdateApproveHash"), Extract(Txn.application_args[1], off.load(), Int(32)))
                 ])]
             ),
 
-
-            Log(Bytes("hi mom")),
             Approve()
         ])
     
