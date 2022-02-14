@@ -113,8 +113,41 @@ class GenTest:
             b += i
 
         emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
-    
-        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 0, 0, b)
+        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
+
+    def getEmitter(self, chain):
+        if chain == 1:
+            return "ec7372995d5cc8732397fb0ad35c0121e0eaa90d26f828a534cab54391b3a4f5"
+        if chain == 2:
+            return "0000000000000000000000003ee18b2214aff97000d974cf647e7c347e8fa585"
+        if chain == 3:
+            return "0000000000000000000000007cf7b764e38a0a5e967972c1df77d432510564e2"
+        if chain == 4:
+            return "000000000000000000000000b6f6d86a8f9879a9c87f643768d9efc38c1da6e7"
+        if chain == 5:
+            return "0000000000000000000000005a58505a96d1dbf8df91cb21b54419fc36e93fde"
+        raise Exception("you suck")
+        
+    def genRegisterChain(self, signers, guardianSet, targetSet, nonce, seq, chain):
+        b  = self.zeroPadBytes[0:((32 -11)*2)]
+        b += self.encoder("uint8", ord("T"))
+        b += self.encoder("uint8", ord("o"))
+        b += self.encoder("uint8", ord("k"))
+        b += self.encoder("uint8", ord("e"))
+        b += self.encoder("uint8", ord("n"))
+        b += self.encoder("uint8", ord("B"))
+        b += self.encoder("uint8", ord("r"))
+        b += self.encoder("uint8", ord("i"))
+        b += self.encoder("uint8", ord("d"))
+        b += self.encoder("uint8", ord("g"))
+        b += self.encoder("uint8", ord("e"))
+
+        b += self.encoder("uint8", 1)  # action
+        b += self.encoder("uint16", 0) # target chain
+        b += self.encoder("uint16", chain)
+        b += self.getEmitter(chain)
+        emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
+        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
 
     def test(self):
         print(self.genGuardianSetUpgrade(self.guardianPrivKeys, 1, 1, 1, 1))

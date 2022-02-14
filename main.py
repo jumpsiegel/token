@@ -381,6 +381,27 @@ class PortalCore:
 
         ret["Meta"] = "Unknown"
 
+        if vaa[off:(off + 32)].hex() == "000000000000000000000000000000000000000000546f6b656e427269646765":
+            ret["Meta"] = "TokenBridge"
+            ret["module"] = vaa[off:(off + 32)].hex()
+            off += 32
+            ret["action"] = int.from_bytes(vaa[off:(off + 1)], "big")
+            off += 1
+            if ret["action"] == 1:
+                ret["Meta"] = "TokenBridge RegisterChain"
+                ret["targetChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+                off += 2
+                ret["EmitterChainID"] = int.from_bytes(vaa[off:(off + 2)], "big")
+                off += 2
+                ret["targetEmitter"] = vaa[off:(off + 32)].hex()
+                off += 32
+            if ret["action"] == 2:
+                ret["Meta"] = "TokenBridge UpgradeContract"
+                ret["targetChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+                off += 2
+                ret["newContract"] = vaa[off:(off + 32)].hex()
+                off += 32
+
         if vaa[off:(off + 32)].hex() == "00000000000000000000000000000000000000000000000000000000436f7265":
             ret["Meta"] = "NewGuardianSetIndex"
             ret["module"] = vaa[off:(off + 32)].hex()
@@ -496,6 +517,7 @@ class PortalCore:
     # cases
 
     def submitVAA(self, vaa, client, sender):
+        # A lot of our logic here depends on parseVAA and knowing what the payload is..
         p = self.parseVAA(vaa)
 
         # First we need to opt into the sequence number 
@@ -598,6 +620,17 @@ class PortalCore:
                 sp=sp
             ))
 
+        if p["Meta"] == "TokenBridge RegisterChain" or p["Meta"] == "TokenBridge UpgradeContract":
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"governance", vaa],
+                accounts=accts,
+                note = p["digest"],
+                sp=sp
+            ))
+
         if p["Meta"] == "TokenBridge Attest":
             # if we DO decode it, we can do a sanity check... of
             # course, the hacker might NOT decode it so we have to
@@ -649,7 +682,7 @@ class PortalCore:
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
-#        q = bytes.fromhex(open("t.vaa", "r").read())
+#        q = bytes.fromhex(open("vaa/TerraTokenBridge.vaa", "r").read())
 #        pprint.pprint(self.parseVAA(q))
 #        sys.exit(0)
 
@@ -672,9 +705,13 @@ class PortalCore:
 
         gt = GenTest()
 
+        seq = 1
+
         print("bootstrapping the guardian set...")
-        bootVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, 1, 1, 1))
+        bootVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
         self.bootGuardians(bootVAA, client, foundation, self.coreid)
+
+        seq += 1
 
         print("grabbing a untrusted account")
         player = self.getTemporaryAccount(client)
@@ -682,12 +719,21 @@ class PortalCore:
         print("")
 
         print("upgrading the the guardian set using untrusted account...")
-        upgradeVAA = bytes.fromhex(open("boot2.vaa", "r").read())
-
+        upgradeVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
         self.submitVAA(upgradeVAA, client, player)
+
+        seq += 1
 
         print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
+
+        for r in range(1, 5):
+            vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 1, 2, seq, seq, r))
+            self.submitVAA(vaa, client, player)
+            sys.exit(0)
+            seq += 1
+
+        sys.exit(0)
 
         print("Create a asset")
         attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
