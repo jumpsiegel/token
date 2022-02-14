@@ -128,7 +128,7 @@ class GenTest:
             return "0000000000000000000000005a58505a96d1dbf8df91cb21b54419fc36e93fde"
         raise Exception("you suck")
         
-    def genRegisterChain(self, signers, guardianSet, targetSet, nonce, seq, chain):
+    def genRegisterChain(self, signers, guardianSet, nonce, seq, chain):
         b  = self.zeroPadBytes[0:((32 -11)*2)]
         b += self.encoder("uint8", ord("T"))
         b += self.encoder("uint8", ord("o"))
@@ -149,8 +149,43 @@ class GenTest:
         emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
         return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
 
+  # AssetMeta:
+
+  # action
+  #PayloadID uint8 = 2
+
+  ## Address of the token. Left-zero-padded if shorter than 32 bytes
+  #TokenAddress [32]uint8
+
+  ## Chain ID of the token
+  #TokenChain uint16
+
+  ## Number of decimals of the token
+  ## (the native decimals, not truncated to 8)
+  #Decimals uint8
+
+  ## Symbol of the token (UTF-8)
+  #Symbol [32]uint8
+
+  ## Name of the token (UTF-8)
+  #Name [32]uint8
+
+
+    def genAssetMeta(self, signers, guardianSet, nonce, seq, tokenAddress, chain, decimals, symbol, name):
+        b  = self.encoder("uint8", 2)
+        b += self.zeroPadBytes[0:((32-len(tokenAddress))*2)]
+        b += tokenAddress.hex()
+        b += self.encoder("uint16", chain)
+        b += self.encoder("uint8", decimals)
+        b += symbol.hex()
+        b += self.zeroPadBytes[0:((32-len(symbol))*2)]
+        b += name.hex()
+        b += self.zeroPadBytes[0:((32-len(name))*2)]
+        emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
+        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
+
     def test(self):
-        print(self.genGuardianSetUpgrade(self.guardianPrivKeys, 1, 1, 1, 1))
+        print(self.genAssetMeta(self.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
 
 if __name__ == '__main__':    
     core = GenTest()

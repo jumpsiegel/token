@@ -682,7 +682,9 @@ class PortalCore:
 #        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
-#        q = bytes.fromhex(open("vaa/TerraTokenBridge.vaa", "r").read())
+        gt = GenTest()
+
+#        q = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
 #        pprint.pprint(self.parseVAA(q))
 #        sys.exit(0)
 
@@ -703,7 +705,6 @@ class PortalCore:
         self.coreid = self.createPortalCoreApp(client=client, sender=foundation)
         print("coreid = " + str(self.coreid))
 
-        gt = GenTest()
 
         seq = 1
 
@@ -729,17 +730,20 @@ class PortalCore:
 
         for r in range(1, 6):
             print("Registering chain " + str(r))
-            vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 1, 2, seq, seq, r))
+            vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 2, seq, seq, r))
             self.submitVAA(vaa, client, player)
             seq += 1
 
         print("Create a asset")
-        attestVAA = bytes.fromhex(open("new_asset.vaa", "r").read())
+        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
         self.submitVAA(attestVAA, client, player)
+        seq += 1
 
+        # I have to recreate the whole object with a new sequence number
         print("Create the same asset")
-        attestVAA = bytes.fromhex(open("same_asset.vaa", "r").read())
-        self.submitVAA(attestVAA, client, player)
+        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
+#        self.submitVAA(attestVAA, client, player)
+        seq += 1
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 
