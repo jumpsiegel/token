@@ -567,7 +567,7 @@ class PortalCore:
                 sender = sender.getAddress(), 
                 sp = sp, 
                 receiver = self.vaa_verify["hash"], 
-                amt = pmt
+                amt = pmt * 2
             )
         )
 
@@ -653,7 +653,11 @@ class PortalCore:
                 )
             )
 
-            sp.fee = sp.min_fee * 2  # pay for the txn on behalf of app
+            nsp = client.suggested_params()
+
+            nsp.fee = nsp.min_fee * 2  # pay for the txn on behalf of app
+            nsp.flat_fee = True
+            pprint.pprint(nsp.__dict__)
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
@@ -662,7 +666,7 @@ class PortalCore:
                 app_args=[b"attest", vaa],
                 accounts=accts,
                 foreign_assets = foreign_assets,
-                sp=sp
+                sp=nsp
             ))
 
         transaction.assign_group_id(txns)
@@ -676,9 +680,14 @@ class PortalCore:
                 grp.append(t.sign(pk))
 
         client.send_transactions(grp)
-        response = self.waitForTransaction(client, grp[-1].get_txid())
-        if "logs" in response.__dict__:
-            pprint.pprint(response.__dict__["logs"])
+        fees = []
+        for x in grp:
+            response = self.waitForTransaction(client, x.get_txid())
+            if "logs" in response.__dict__ and len(response.__dict__["logs"]) > 0:
+                pprint.pprint(response.__dict__["logs"])
+            fees.append(response.__dict__["txn"]["txn"]["fee"])
+
+        pprint.pprint(fees)
 
 #        if len(response.__dict__["logs"]) > 0:
 #            pprint.pprint(response.__dict__["logs"][0].hex())
@@ -722,9 +731,15 @@ class PortalCore:
         print(player.getAddress())
         print("")
 
+        bal = self.getBalances(client, player.getAddress())
+        pprint.pprint(bal)
+
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
         self.submitVAA(upgradeVAA, client, player)
+
+        bal = self.getBalances(client, player.getAddress())
+        pprint.pprint(bal)
 
         seq += 1
 
@@ -736,6 +751,9 @@ class PortalCore:
             vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 2, seq, seq, r))
             self.submitVAA(vaa, client, player)
             seq += 1
+
+            bal = self.getBalances(client, player.getAddress())
+            pprint.pprint(bal)
 
         print("Create a asset")
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
@@ -751,6 +769,9 @@ class PortalCore:
             attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
             self.submitVAA(attestVAA, client, player)
             seq += 1
+
+            if (r == 3):
+                sys.exit(0)
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
 

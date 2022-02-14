@@ -275,6 +275,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
                 a.store(Extract(buf.load(), Int(8), Int(32))),
                 Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
+                # Update the name/symbol if you attest twice for same thing...
             ])),
     
             Approve()

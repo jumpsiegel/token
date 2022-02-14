@@ -1,3 +1,9 @@
+
+
+Update the name/symbol if you attest twice for same thing...
+
+
+
  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
  rustip default nightly-2021-08-01
 

@@ -123,10 +123,19 @@ def getCoreContracts(   client: AlgodClient,
             a = ScratchVar()
             emitter = ScratchVar()
             idx = ScratchVar()
+            set = ScratchVar()
             len = ScratchVar()
 
             return Seq([
-                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
+                # All governance must be done with the most recent guardian set
+                set.store(App.globalGet(Bytes("currentGuardianSetIndex"))),
+                If(set.load() != Bytes(""), Seq([
+                        idx.store(Extract(Txn.application_args[1], Int(1), Int(4))),
+                        Assert(idx.load() == set.load()),
+                ])),
+
+                # The offset of the chain
+                off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), 
                 # Correct chain? 
                 Assert(Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0001")),
                 # Correct emitter?
@@ -160,6 +169,9 @@ def getCoreContracts(   client: AlgodClient,
 
                         # Lets see if the user handed us the correct memory... no hacky hacky
                         Assert(Txn.accounts[3] == get_sig_address(idx.load(), Bytes("guardian"))), 
+
+                        # Write this away till the next time
+                        App.globalPut(Bytes("currentGuardianSetIndex"), Extract(Txn.application_args[1], off.load(), Int(4))),
 
                         # Write everything out to the auxilliary storage
                         off.store(off.load() + Int(4)),
@@ -204,6 +216,8 @@ def getCoreContracts(   client: AlgodClient,
             byte_offset = ScratchVar()
 
             return Seq(
+                Assert(Btoi(Extract(Txn.application_args[1], Int(0), Int(1))) == Int(1)),
+
                 off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(16)), # The offset of the emitter
                 emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
                 sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(32), Int(8)))),
@@ -368,6 +382,7 @@ def getCoreContracts(   client: AlgodClient,
         on_create = Seq( [
             App.globalPut(Bytes("booted"), Bytes("false")),
             App.globalPut(Bytes("vphash"), Bytes("")),
+            App.globalPut(Bytes("currentGuardianSetIndex"), Bytes("")),
             App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
             App.globalPut(Bytes("validUpdateClearHash"), Bytes("BJATCHES5YJZJ7JITYMVLSSIQAVAWBQRVGPQUDT5AZ2QSLDSXWWM46THOY")), # empty clear state program
             Return(Int(1))
