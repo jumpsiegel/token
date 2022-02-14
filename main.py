@@ -735,14 +735,16 @@ class PortalCore:
             seq += 1
 
         print("Create a asset")
+        print(seq)
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
         # I have to recreate the whole object with a new sequence number
         print("Create the same asset")
+        print(seq)
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
-#        self.submitVAA(attestVAA, client, player)
+        self.submitVAA(attestVAA, client, player)
         seq += 1
 
         #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
