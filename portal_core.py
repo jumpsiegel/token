@@ -218,10 +218,12 @@ def getCoreContracts(   client: AlgodClient,
             byte_offset = ScratchVar()
 
             return Seq(
+                # VM only is version 1
                 Assert(Btoi(Extract(Txn.application_args[1], Int(0), Int(1))) == Int(1)),
 
                 off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the emitter
 
+                # emitter is chain/contract-address
                 emitter.store(Extract(Txn.application_args[1], off.load(), Int(34))),
                 sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(34), Int(8)))),
 
