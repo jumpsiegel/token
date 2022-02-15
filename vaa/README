@@ -1,0 +1,1 @@
+~/repos/wormhole/cli/target/debug/wormhole vaa dump `cat SolanaTokenBridge.vaa`  > SolanaTokenBridge.txt

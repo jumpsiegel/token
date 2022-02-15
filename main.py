@@ -753,10 +753,6 @@ class PortalCore:
             self.submitVAA(vaa, client, player)
             seq += 1
 
-#            pprint.pprint(self.parseVAA(vaa))
-#            print(vaa.hex())
-#            sys.exit(0)
-
             bal = self.getBalances(client, player.getAddress())
             pprint.pprint(bal)
 

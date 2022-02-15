@@ -181,7 +181,7 @@ class GenTest:
         b += self.zeroPadBytes[0:((32-len(symbol))*2)]
         b += name.hex()
         b += self.zeroPadBytes[0:((32-len(name))*2)]
-        emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
+        emitter = bytes.fromhex(self.getEmitter(chain))
         return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
 
     def test(self):
