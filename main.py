@@ -761,22 +761,22 @@ class PortalCore:
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
-        for r in range(1, 50000):
-            bal = self.getBalances(client, player.getAddress())
-            pprint.pprint(bal)
+        print("Create the same asset " + str(seq))
+        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
+        self.submitVAA(attestVAA, client, player)
+        seq += 1
 
-            # I have to recreate the whole object with a new sequence number
-            print("Create the same asset " + str(seq))
-            attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
-            self.submitVAA(attestVAA, client, player)
-            seq += 1
+        print("foundation account: " + foundation.getAddress())
+        pprint.pprint(client.account_info(foundation.getAddress()))
 
-            if (r == 3):
-                sys.exit(0)
+        print("player account: " + player.getAddress())
+        pprint.pprint(client.account_info(player.getAddress()))
 
-        #pprint.pprint(self.lookupGuardians(client, player, appID, 1))
+        print("core app: " + get_application_address(self.coreid))
+        pprint.pprint(client.account_info(get_application_address(self.coreid))),
 
-        #pprint.pprint(self.read_state(client, foundation.getAddress(), appID))
+        print("token app: " + get_application_address(self.tokenid))
+        pprint.pprint(client.account_info(get_application_address(self.tokenid))),
 
 core = PortalCore()
 core.simple_core()

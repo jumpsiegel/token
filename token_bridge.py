@@ -228,9 +228,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
-            c.store(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))),
-            a.store(App.globalGet(c.load())),
-
+            # We coming from the correct emitter?
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
             off.store(off.load()+Int(43)),
@@ -245,6 +243,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
             # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
+            #   This confirms the user gave us access to the correct memory for this asset..
             Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
 
             # Lets see if we've seen this asset before
@@ -277,7 +276,22 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
                 a.store(Extract(buf.load(), Int(8), Int(32))),
                 Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
-                # Update the name/symbol if you attest twice for same thing...
+
+                a.store(Btoi(asset.load())),
+
+                # logic eval error: this transaction should be issued by the manager. It is issued by VDBLICGSGBJJLWJJGSXBBANRC6M7PXJUNNFZDOULTV7GR766USPFIP5ZD4, manager key AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ.
+
+#                InnerTxnBuilder.Begin(),
+#                InnerTxnBuilder.SetFields(
+#                    {
+#                        TxnField.type_enum: TxnType.AssetConfig,
+#                        TxnField.config_asset: a.load(),
+#                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
+#                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()) # TODO: ??
+#                    }
+#                ),
+#                InnerTxnBuilder.Submit(),
+#                Assert(a.load() == InnerTxn.created_asset_id())
             ])),
     
             Approve()
@@ -349,10 +363,7 @@ def get_token_bridge(client: AlgodClient, seed_amt: int = 0, tmpl_sig: TmplSig =
 
     return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
 
-# 
-# 
-# 
-# 
+
 #     @Subroutine(TealType.none)
 #     def axfer(reciever: TealType.bytes, aid: TealType.uint64, amt: TealType.uint64):
 #         return Seq(
@@ -382,31 +393,5 @@ def get_token_bridge(client: AlgodClient, seed_amt: int = 0, tmpl_sig: TmplSig =
 #                 }
 #             ),
 #             InnerTxnBuilder.Submit(),
-#         )
-# 
-#         return Seq(
-#             pool_token_check,
-#             # Make sure we've not already set this
-#             Assert(Not(pool_token_check.hasValue())),
-#             Assert(well_formed_bootstrap),
-#             # Create the pool token
-#             InnerTxnBuilder.Begin(),
-#             InnerTxnBuilder.SetFields(
-#                 {
-#                     TxnField.type_enum: TxnType.AssetConfig,
-#                     TxnField.config_asset_name: Concat(
-#                         Bytes("GovernanceToken-"), itoa(Global.current_application_id())
-#                     ),
-#                     TxnField.config_asset_unit_name: Bytes("algo-gov"),
-#                     TxnField.config_asset_total: Int(total_supply),
-#                     TxnField.config_asset_manager: me,
-#                     TxnField.config_asset_reserve: me,
-#                     TxnField.fee: Int(0),
-#                 }
-#             ),
-#             InnerTxnBuilder.Submit(),
-#             # Write it to global state
-#             App.globalPut(pool_token_key, InnerTxn.created_asset_id()),
-#             Int(1),
 #         )
 # 
