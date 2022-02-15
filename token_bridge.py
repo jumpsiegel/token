@@ -279,19 +279,16 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                 a.store(Btoi(asset.load())),
 
-                # logic eval error: this transaction should be issued by the manager. It is issued by VDBLICGSGBJJLWJJGSXBBANRC6M7PXJUNNFZDOULTV7GR766USPFIP5ZD4, manager key AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ.
-
-#                InnerTxnBuilder.Begin(),
-#                InnerTxnBuilder.SetFields(
-#                    {
-#                        TxnField.type_enum: TxnType.AssetConfig,
-#                        TxnField.config_asset: a.load(),
-#                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
-#                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()) # TODO: ??
-#                    }
-#                ),
-#                InnerTxnBuilder.Submit(),
-#                Assert(a.load() == InnerTxn.created_asset_id())
+                InnerTxnBuilder.Begin(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetConfig,
+                        TxnField.config_asset: a.load(),
+                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
+                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()) # TODO: ??
+                    }
+                ),
+                InnerTxnBuilder.Submit(),
             ])),
     
             Approve()
