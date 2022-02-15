@@ -156,6 +156,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             )),
 
             off.store(off.load() + Int(43)),
+            # correct module?
             Assert(Extract(Txn.application_args[1], off.load(), Int(32)) == Bytes("base16", "000000000000000000000000000000000000000000546f6b656e427269646765")),
             off.store(off.load() + Int(32)),
             a.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(1)))),
@@ -164,7 +165,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Cond( 
                 [a.load() == Int(1), Seq([
                     targetChain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
-                    # can we really register a chain JUST for our chain?
+                    # can we really register a chain JUST for our chain?  Is this Or reasonable?
                     Assert(Or((targetChain.load() == Int(0)), (targetChain.load() == Int(8)))),
 
                     off.store(off.load() + Int(2)),
