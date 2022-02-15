@@ -279,13 +279,17 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                 a.store(Btoi(asset.load())),
 
+                # I've been told we are supposted to update the name if we see it a second time
+                Name.store(trim_bytes(Name.load())),
+                Symbol.store(trim_bytes(Symbol.load())),
+
                 InnerTxnBuilder.Begin(),
                 InnerTxnBuilder.SetFields(
                     {
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset: a.load(),
-                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
-                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()) # TODO: ??
+                        TxnField.config_asset_name: Name.load(),       # TODO: Not having a effect
+                        TxnField.config_asset_unit_name: Symbol.load()
                     }
                 ),
                 InnerTxnBuilder.Submit(),

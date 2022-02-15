@@ -761,6 +761,10 @@ class PortalCore:
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
+        print("Create the same asset " + str(seq))
+        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USD2C", b"Circle2Coin"))
+        self.submitVAA(attestVAA, client, player)
+        seq += 1
         print("foundation account: " + foundation.getAddress())
         pprint.pprint(client.account_info(foundation.getAddress()))
 
@@ -773,10 +777,6 @@ class PortalCore:
         print("token app: " + get_application_address(self.tokenid))
         pprint.pprint(client.account_info(get_application_address(self.tokenid))),
 
-        print("Create the same asset " + str(seq))
-        attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
-        self.submitVAA(attestVAA, client, player)
-        seq += 1
 
 core = PortalCore()
 core.simple_core()
