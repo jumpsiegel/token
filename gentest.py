@@ -4,6 +4,8 @@ import pprint
 import time
 from Cryptodome.Hash import keccak
 import coincurve
+import base64
+from algosdk.encoding import decode_address
 
 class GenTest:
     def __init__(self) -> None:
@@ -149,28 +151,6 @@ class GenTest:
         emitter = bytes.fromhex(self.zeroPadBytes[0:(31*2)] + "04")
         return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
 
-  # AssetMeta:
-
-  # action
-  #PayloadID uint8 = 2
-
-  ## Address of the token. Left-zero-padded if shorter than 32 bytes
-  #TokenAddress [32]uint8
-
-  ## Chain ID of the token
-  #TokenChain uint16
-
-  ## Number of decimals of the token
-  ## (the native decimals, not truncated to 8)
-  #Decimals uint8
-
-  ## Symbol of the token (UTF-8)
-  #Symbol [32]uint8
-
-  ## Name of the token (UTF-8)
-  #Name [32]uint8
-
-
     def genAssetMeta(self, signers, guardianSet, nonce, seq, tokenAddress, chain, decimals, symbol, name):
         b  = self.encoder("uint8", 2)
         b += self.zeroPadBytes[0:((32-len(tokenAddress))*2)]
@@ -184,8 +164,27 @@ class GenTest:
         emitter = bytes.fromhex(self.getEmitter(chain))
         return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
 
+    def genTransfer(self, signers, guardianSet, nonce, seq, amount, tokenAddress, tokenChain, toAddress, toChain, fee):
+        b  = self.encoder("uint8", 1)
+        b += self.encoder("uint256", int(amount * 100000000))
+
+        b += self.zeroPadBytes[0:((32-len(tokenAddress))*2)]
+        b += tokenAddress.hex()
+
+        b += self.encoder("uint16", tokenChain)
+
+        b += self.zeroPadBytes[0:((32-len(toAddress))*2)]
+        b += toAddress.hex()
+
+        b += self.encoder("uint16", toChain)
+
+        b += self.encoder("uint256", int(fee * 100000000))
+
+        emitter = bytes.fromhex(self.getEmitter(tokenChain))
+        return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
+
     def test(self):
-        print(self.genAssetMeta(self.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
+        print(self.genTransfer(self.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address("ROOKEPZMHHBAEH75Y44OCNXQAGTXZWG3PY7IYQQCMXO7IG7DJMVHU32YVI"), 8, 0))
 
 if __name__ == '__main__':    
     core = GenTest()
