@@ -316,15 +316,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         Destination = ScratchVar()
         DestChain = ScratchVar()
         Fee = ScratchVar()
-#        Address = ScratchVar()
-#        Decimals = ScratchVar()
-#        Symbol = ScratchVar()
-#        Name = ScratchVar()
-#
         asset = ScratchVar()
-#        buf = ScratchVar()
-#        c = ScratchVar()
-#        a = ScratchVar()
     
         return Seq([
             Assert(And(
@@ -360,10 +352,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     
             off.store(off.load()+Int(43)),
 
-            # This is a transfer message
+            # This is a transfer message... right?
             Assert(Int(1) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
-
-            Log(Bytes("transfer")),
 
             # TODO: add assert that the first 24 bytes are zero
             Amount.store(        Btoi(Extract(Txn.application_args[1], off.load() + Int(25), Int(8)))),  # uint256
@@ -374,63 +364,34 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # TODO: add assert that the first 24 bytes are zero
             Fee.store(           Btoi(Extract(Txn.application_args[1], off.load() + Int(125),Int(8)))),  # uint256
 
-            # This a reasonable assert
-            Assert(OriginChain.load() == Chain.load()),
-
-            Assert(Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())),
-
             # Lets see if we've seen this asset before
-            asset.store(blob.read(Int(3), Int(0), Int(8))),
+            asset.store(Btoi(blob.read(Int(3), Int(0), Int(8)))),
 
-            # assert this out so that they can go attest for this and then resubmit the vaa
-            Assert(asset.load() != Itob(Int(0))),
+            # This a reasonable assert
+            Assert(And(
+                # would they ever be different?
+                OriginChain.load() == Chain.load(),
+                # Directed at this chain?
+                DestChain.load() == Int(8),
+                # This a asset we know about?
+                asset.load() != Int(0),
+                # Did they hand us the correct address? (no hacky hacky)
+                Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())
+            )),
 
-#            If(asset.load() == Itob(Int(0))).Then(Seq([
-#                InnerTxnBuilder.Begin(),
-#                InnerTxnBuilder.SetFields(
-#                    {
-#                        TxnField.type_enum: TxnType.AssetConfig,
-#                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
-#                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
-#                        TxnField.config_asset_total: Int(int(1e17)),
-#                        TxnField.config_asset_decimals: Decimals.load(),
-#                        TxnField.config_asset_manager: me,
-#                        TxnField.config_asset_freeze: me,
-#                        TxnField.config_asset_clawback: me,
-#                        TxnField.config_asset_reserve: me,
-#                        # TODO: It would be really nice if we could do base encoding... can that be done in pyteal?
-#                        TxnField.config_asset_url: Concat(Itob(Chain.load()), Address.load()),
-#                        TxnField.fee: Int(0),
-#                    }
-#                ),
-#                InnerTxnBuilder.Submit(),
-#
-#                asset.store(Itob(InnerTxn.created_asset_id())),
-#                Pop(blob.write(Int(3), Int(0), asset.load())),
-#            ])).Else(Seq([
-#                buf.store(extract_url(Btoi(asset.load()))),
-#                c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
-#                a.store(Extract(buf.load(), Int(8), Int(32))),
-#                Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
-#
-#                a.store(Btoi(asset.load())),
-#
-#                # I've been told we are supposted to update the name if we see it a second time
-#                Name.store(trim_bytes(Name.load())),
-#                Symbol.store(trim_bytes(Symbol.load())),
-#
-#                InnerTxnBuilder.Begin(),
-#                InnerTxnBuilder.SetFields(
-#                    {
-#                        TxnField.type_enum: TxnType.AssetConfig,
-#                        TxnField.config_asset: a.load(),
-#                        TxnField.config_asset_name: Name.load(),       # TODO: Not having a effect
-#                        TxnField.config_asset_unit_name: Symbol.load()
-#                    }
-#                ),
-#                InnerTxnBuilder.Submit(),
-#            ])),
-    
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                 {
+                     TxnField.type_enum: TxnType.AssetTransfer,
+                     TxnField.xfer_asset: asset.load(),
+                     TxnField.asset_amount: Amount.load(),
+                     TxnField.asset_receiver: Destination.load(),
+                 }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            Log(Bytes("transfer")),
+
             Approve()
         ])
 
