@@ -690,6 +690,8 @@ class PortalCore:
                 )
             )
 
+            pprint.pprint(foreign_assets),
+
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.tokenid,
@@ -796,11 +798,6 @@ class PortalCore:
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
-        transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
-        self.submitVAA(transferVAA, client, player)
-        seq += 1
-        sys.exit(0)
-
         print("foundation account: " + foundation.getAddress())
         pprint.pprint(client.account_info(foundation.getAddress()))
 
@@ -813,6 +810,9 @@ class PortalCore:
         print("token app: " + get_application_address(self.tokenid))
         pprint.pprint(client.account_info(get_application_address(self.tokenid))),
 
+        transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
+        self.submitVAA(transferVAA, client, player)
+        seq += 1
 
 core = PortalCore()
 core.simple_core()

@@ -379,6 +379,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())
             )),
 
+            # Actually send the coins...
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                  {
