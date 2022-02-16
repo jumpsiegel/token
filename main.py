@@ -361,6 +361,15 @@ class PortalCore:
 
         return sig_addr
 
+    def asset_optin(self, client, sender, asset):
+        sp = client.suggested_params()
+        optin_txn = transaction.AssetOptInTxn(sender = sender.getAddress(), sp = sp, index = asset)
+        transaction.assign_group_id([optin_txn])
+        signed_optin = optin_txn.sign(sender.getPrivateKey())
+        client.send_transactions([signed_optin])
+        resp = self.waitForTransaction(client, signed_optin.get_txid())
+        pprint.pprint(resp.__dict__)
+
     def parseVAA(self, vaa):
 #        print (vaa.hex())
         ret = {"version": int.from_bytes(vaa[0:1], "big"), "index": int.from_bytes(vaa[1:5], "big"), "siglen": int.from_bytes(vaa[5:6], "big")}
@@ -690,7 +699,8 @@ class PortalCore:
                 )
             )
 
-            pprint.pprint(foreign_assets),
+            print ("opting in")
+            self.asset_optin(client, sender, foreign_assets[0])
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
@@ -798,6 +808,11 @@ class PortalCore:
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
+        print("Transfer the asset " + str(seq))
+        transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
+        self.submitVAA(transferVAA, client, player)
+        seq += 1
+
         print("foundation account: " + foundation.getAddress())
         pprint.pprint(client.account_info(foundation.getAddress()))
 
@@ -810,9 +825,6 @@ class PortalCore:
         print("token app: " + get_application_address(self.tokenid))
         pprint.pprint(client.account_info(get_application_address(self.tokenid))),
 
-        transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
-        self.submitVAA(transferVAA, client, player)
-        seq += 1
 
 core = PortalCore()
 core.simple_core()
