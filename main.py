@@ -420,9 +420,9 @@ class PortalCore:
             ret["Meta"] = "TokenBridge Attest"
             ret["Type"] = int.from_bytes((vaa[off:off+1]), "big")
             off += 1
-            ret["Address"] = vaa[off:(off + 32)].hex()
+            ret["Contract"] = vaa[off:(off + 32)].hex()
             off += 32
-            ret["Chain"] = int.from_bytes(vaa[off:(off + 2)], "big")
+            ret["FromChain"] = int.from_bytes(vaa[off:(off + 2)], "big")
             off += 2
             ret["Decimals"] = int.from_bytes((vaa[off:off+1]), "big")
             off += 1
@@ -432,6 +432,7 @@ class PortalCore:
 
         if ((len(vaa[off:])) == 133) and int.from_bytes((vaa[off:off+1]), "big") == 1:
             ret["Meta"] = "TokenBridge Transfer"
+            ret["Type"] = int.from_bytes((vaa[off:off+1]), "big")
             off += 1
             ret["Amount"] = vaa[off:(off + 32)].hex()
             off += 32
@@ -539,7 +540,11 @@ class PortalCore:
         # When we attest for a new token, we need some place to store the info... later we will need to 
         # mirror the other way as well
         if p["Meta"] == "TokenBridge Attest":
-            chain_addr = self.optin(client, sender, self.tokenid, p["Chain"], p["Address"])
+            chain_addr = self.optin(client, sender, self.tokenid, p["FromChain"], p["Contract"])
+            accts.append(chain_addr)
+
+        if p["Meta"] == "TokenBridge Transfer":
+            chain_addr = self.optin(client, sender, self.tokenid, p["FromChain"], p["Contract"])
             accts.append(chain_addr)
 
         keys = self.decodeLocalState(client, sender, self.coreid, guardian_addr)
@@ -658,7 +663,6 @@ class PortalCore:
 
             nsp.fee = nsp.min_fee * 2  # pay for the txn on behalf of app
             nsp.flat_fee = True
-            pprint.pprint(nsp.__dict__)
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
@@ -668,6 +672,31 @@ class PortalCore:
                 accounts=accts,
                 foreign_assets = foreign_assets,
                 sp=nsp
+            ))
+
+        if p["Meta"] == "TokenBridge Transfer":
+            asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
+            foreign_assets = []
+            if (len(asset) > 8):
+                foreign_assets.append(int.from_bytes(asset[0:8], "big"))
+
+            txns.append(
+                transaction.PaymentTxn(
+                    sender = sender.getAddress(),
+                    sp = sp, 
+                    receiver = get_application_address(self.tokenid),
+                    amt = sp.min_fee
+                )
+            )
+
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"transfer", vaa],
+                accounts=accts,
+                foreign_assets = foreign_assets,
+                sp=sp
             ))
 
         transaction.assign_group_id(txns)
@@ -765,6 +794,12 @@ class PortalCore:
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USD2C", b"Circle2Coin"))
         self.submitVAA(attestVAA, client, player)
         seq += 1
+
+        transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
+        self.submitVAA(transferVAA, client, player)
+        seq += 1
+        sys.exit(0)
+
         print("foundation account: " + foundation.getAddress())
         pprint.pprint(client.account_info(foundation.getAddress()))
 

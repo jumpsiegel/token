@@ -299,12 +299,130 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Approve()
         ])
 
+    def transfer():
+        me = Global.current_application_address()
+        off = ScratchVar()
+    
+        Address = ScratchVar()
+        Chain = ScratchVar()
+        Decimals = ScratchVar()
+        Symbol = ScratchVar()
+        Name = ScratchVar()
+
+        asset = ScratchVar()
+        buf = ScratchVar()
+        c = ScratchVar()
+        a = ScratchVar()
+    
+        return Seq([
+            Assert(And(
+                # Lets see if the vaa we are about to process was actually verified by the core
+                Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
+                Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
+                Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index() - Int(2)].application_args[1] == Txn.application_args[1],
+
+                # We all opted into the same accounts?
+                Gtxn[Txn.group_index() - Int(2)].accounts[0] == Txn.accounts[0],
+                Gtxn[Txn.group_index() - Int(2)].accounts[1] == Txn.accounts[1],
+                Gtxn[Txn.group_index() - Int(2)].accounts[2] == Txn.accounts[2],
+    
+                # Did the user pay us to do the transfer?
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
+                Gtxn[Txn.group_index() - Int(1)].amount() >= Int(1000),
+                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(1)].receiver() == me,
+                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+    
+                (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
+            )),
+
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
+
+            Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
+
+            # We coming from the correct emitter?
+            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
+    
+            off.store(off.load()+Int(43)),
+
+            Assert(Int(1) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
+
+            Log(Bytes("transfer")),
+
+#            Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
+#    
+#            # Has the nice effect of ALSO testing we are looking at the correct object..
+#            Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
+#            Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
+#            Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
+#            Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
+#
+#            # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
+#            #   This confirms the user gave us access to the correct memory for this asset..
+#            Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
+#
+#            # Lets see if we've seen this asset before
+#            asset.store(blob.read(Int(3), Int(0), Int(8))),
+#
+#            If(asset.load() == Itob(Int(0))).Then(Seq([
+#                InnerTxnBuilder.Begin(),
+#                InnerTxnBuilder.SetFields(
+#                    {
+#                        TxnField.type_enum: TxnType.AssetConfig,
+#                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
+#                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
+#                        TxnField.config_asset_total: Int(int(1e17)),
+#                        TxnField.config_asset_decimals: Decimals.load(),
+#                        TxnField.config_asset_manager: me,
+#                        TxnField.config_asset_freeze: me,
+#                        TxnField.config_asset_clawback: me,
+#                        TxnField.config_asset_reserve: me,
+#                        # TODO: It would be really nice if we could do base encoding... can that be done in pyteal?
+#                        TxnField.config_asset_url: Concat(Itob(Chain.load()), Address.load()),
+#                        TxnField.fee: Int(0),
+#                    }
+#                ),
+#                InnerTxnBuilder.Submit(),
+#
+#                asset.store(Itob(InnerTxn.created_asset_id())),
+#                Pop(blob.write(Int(3), Int(0), asset.load())),
+#            ])).Else(Seq([
+#                buf.store(extract_url(Btoi(asset.load()))),
+#                c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
+#                a.store(Extract(buf.load(), Int(8), Int(32))),
+#                Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
+#
+#                a.store(Btoi(asset.load())),
+#
+#                # I've been told we are supposted to update the name if we see it a second time
+#                Name.store(trim_bytes(Name.load())),
+#                Symbol.store(trim_bytes(Symbol.load())),
+#
+#                InnerTxnBuilder.Begin(),
+#                InnerTxnBuilder.SetFields(
+#                    {
+#                        TxnField.type_enum: TxnType.AssetConfig,
+#                        TxnField.config_asset: a.load(),
+#                        TxnField.config_asset_name: Name.load(),       # TODO: Not having a effect
+#                        TxnField.config_asset_unit_name: Symbol.load()
+#                    }
+#                ),
+#                InnerTxnBuilder.Submit(),
+#            ])),
+    
+            Approve()
+        ])
+
     METHOD = Txn.application_args[0]
 
     on_delete = Seq([Reject()])
 
     router = Cond(
         [METHOD == Bytes("attest"), attest()],
+        [METHOD == Bytes("transfer"), transfer()],
         [METHOD == Bytes("governance"), governance()],
     )
 
