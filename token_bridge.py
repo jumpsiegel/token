@@ -243,6 +243,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
+            # Lets not overflow the system...
+            If(Decimals.load() > Int(8), Decimals.store(Int(8))),
+
             # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
             #   This confirms the user gave us access to the correct memory for this asset..
             Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
@@ -303,16 +306,23 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         me = Global.current_application_address()
         off = ScratchVar()
     
-        Address = ScratchVar()
         Chain = ScratchVar()
-        Decimals = ScratchVar()
-        Symbol = ScratchVar()
-        Name = ScratchVar()
 
-        asset = ScratchVar()
-        buf = ScratchVar()
-        c = ScratchVar()
-        a = ScratchVar()
+        Amount = ScratchVar()
+        Origin = ScratchVar()
+        OriginChain = ScratchVar()
+        Destination = ScratchVar()
+        DestChain = ScratchVar()
+        Fee = ScratchVar()
+#        Address = ScratchVar()
+#        Decimals = ScratchVar()
+#        Symbol = ScratchVar()
+#        Name = ScratchVar()
+#
+#        asset = ScratchVar()
+#        buf = ScratchVar()
+#        c = ScratchVar()
+#        a = ScratchVar()
     
         return Seq([
             Assert(And(
@@ -348,11 +358,17 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     
             off.store(off.load()+Int(43)),
 
+            # This is a transfer message
             Assert(Int(1) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
 
             Log(Bytes("transfer")),
 
-#            Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
+            Amount.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),  # uint256
+            Origin.store(             Extract(Txn.application_args[1], off.load() + Int(33), Int(32))),
+            OriginChain.store(        Extract(Txn.application_args[1], off.load() + Int(65), Int(2))),
+            Destination.store(        Extract(Txn.application_args[1], off.load() + Int(67), Int(32))),
+            DestChain.store(          Extract(Txn.application_args[1], off.load() + Int(99), Int(2))),
+            Fee.store(                Extract(Txn.application_args[1], off.load() + Int(101),Int(32))),  # uint256
 #    
 #            # Has the nice effect of ALSO testing we are looking at the correct object..
 #            Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),

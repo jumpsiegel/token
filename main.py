@@ -301,6 +301,7 @@ class PortalCore:
             global_schema=globalSchema,
             local_schema=localSchema,
             app_args=app_args,
+            extra_pages = 1,
             sp=client.suggested_params(),
         )
     
