@@ -243,7 +243,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
-            # Lets not overflow the system...
+            # Due to constrains on some supported chains, all token amounts passed through the token bridge are truncated to a maximum of 8 decimals.
+            # 
+            # Any chains implementation must make sure that of any token only ever MaxUint64 units (post-shifting) are bridged into the wormhole network at any given time (all target chains combined), even tough the slot is 32 bytes long (theoretically fitting uint256).
             If(Decimals.load() > Int(8), Decimals.store(Int(8))),
 
             # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
@@ -319,7 +321,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 #        Symbol = ScratchVar()
 #        Name = ScratchVar()
 #
-#        asset = ScratchVar()
+        asset = ScratchVar()
 #        buf = ScratchVar()
 #        c = ScratchVar()
 #        a = ScratchVar()
@@ -363,26 +365,26 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             Log(Bytes("transfer")),
 
-            Amount.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),  # uint256
+            # TODO: add assert that the first 24 bytes are zero
+            Amount.store(        Btoi(Extract(Txn.application_args[1], off.load() + Int(25), Int(8)))),  # uint256
             Origin.store(             Extract(Txn.application_args[1], off.load() + Int(33), Int(32))),
-            OriginChain.store(        Extract(Txn.application_args[1], off.load() + Int(65), Int(2))),
+            OriginChain.store(   Btoi(Extract(Txn.application_args[1], off.load() + Int(65), Int(2)))),
             Destination.store(        Extract(Txn.application_args[1], off.load() + Int(67), Int(32))),
-            DestChain.store(          Extract(Txn.application_args[1], off.load() + Int(99), Int(2))),
-            Fee.store(                Extract(Txn.application_args[1], off.load() + Int(101),Int(32))),  # uint256
-#    
-#            # Has the nice effect of ALSO testing we are looking at the correct object..
-#            Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
-#            Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
-#            Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
-#            Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
-#
-#            # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
-#            #   This confirms the user gave us access to the correct memory for this asset..
-#            Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
-#
-#            # Lets see if we've seen this asset before
-#            asset.store(blob.read(Int(3), Int(0), Int(8))),
-#
+            DestChain.store(     Btoi(Extract(Txn.application_args[1], off.load() + Int(99), Int(2)))),
+            # TODO: add assert that the first 24 bytes are zero
+            Fee.store(           Btoi(Extract(Txn.application_args[1], off.load() + Int(125),Int(8)))),  # uint256
+
+            # This a reasonable assert
+            Assert(OriginChain.load() == Chain.load()),
+
+            Assert(Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())),
+
+            # Lets see if we've seen this asset before
+            asset.store(blob.read(Int(3), Int(0), Int(8))),
+
+            # assert this out so that they can go attest for this and then resubmit the vaa
+            Assert(asset.load() != Itob(Int(0))),
+
 #            If(asset.load() == Itob(Int(0))).Then(Seq([
 #                InnerTxnBuilder.Begin(),
 #                InnerTxnBuilder.SetFields(
