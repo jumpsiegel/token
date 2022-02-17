@@ -207,7 +207,7 @@ class PortalCore:
         return balances
 
     def fullyCompileContract(self, client: AlgodClient, contract: Expr) -> bytes:
-        teal = compileTeal(contract, mode=Mode.Application, version=5)
+        teal = compileTeal(contract, mode=Mode.Application, version=6)
         response = client.compile(teal)
         return response
 
