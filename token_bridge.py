@@ -304,7 +304,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Approve()
         ])
 
-    def transfer():
+    def receiveTransfer():
         me = Global.current_application_address()
         off = ScratchVar()
     
@@ -410,7 +410,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         }
                     ),
                     InnerTxnBuilder.Submit(),
-            ])
+            ])),
 
             Approve()
         ])
@@ -421,7 +421,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
     router = Cond(
         [METHOD == Bytes("attest"), attest()],
-        [METHOD == Bytes("transfer"), transfer()],
+        [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
         [METHOD == Bytes("governance"), governance()],
     )
 

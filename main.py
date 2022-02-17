@@ -725,14 +725,14 @@ class PortalCore:
             self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
 
             # And this is how the relayer gets paid...
-            if (p["Fee"] != self.zeroPadBytes:
+            if p["Fee"] != self.zeroPadBytes:
                 self.asset_optin(client, sender, foreign_assets[0], sender.getAddress())
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.tokenid,
                 on_complete=transaction.OnComplete.NoOpOC,
-                app_args=[b"transfer", vaa],
+                app_args=[b"receiveTransfer", vaa],
                 accounts=accts,
                 foreign_assets = foreign_assets,
                 sp=sp
