@@ -18,7 +18,7 @@ from TmplSig import TmplSig
 from algosdk.v2client.algod import AlgodClient
 from algosdk.kmd import KMDClient
 from algosdk import account, mnemonic
-from algosdk.encoding import decode_address
+from algosdk.encoding import decode_address, encode_address
 from algosdk.future import transaction
 from pyteal import compileTeal, Mode, Expr
 from pyteal import *
@@ -93,10 +93,12 @@ class PortalCore:
 
         self.seed_amt = int(1001000)  # The black magic in this number... 
         self.cache = {}
+        self.asset_cache = {}
 
         self.kmdAccounts : Optional[List[Account]] = None
 
         self.accountList : List[Account] = []
+        self.zeroPadBytes = "00"*32
 
     def waitForTransaction(
             self, client: AlgodClient, txID: str, timeout: int = 10
@@ -361,14 +363,34 @@ class PortalCore:
 
         return sig_addr
 
-    def asset_optin(self, client, sender, asset):
+    def asset_optin(self, client, sender, asset, receiver):
+        if receiver not in self.asset_cache:
+            self.asset_cache[receiver] = {}
+
+        if asset in self.asset_cache[receiver]:
+            return
+
+        ai = client.account_info(receiver)
+        if "assets" in ai:
+            for x in ai["assets"]:
+                if x["asset-id"] == asset:
+                    self.asset_cache[receiver][asset] = True
+                    return
+
         sp = client.suggested_params()
-        optin_txn = transaction.AssetOptInTxn(sender = sender.getAddress(), sp = sp, index = asset)
+        optin_txn = transaction.AssetTransferTxn(
+            sender = sender.getAddress(), 
+            sp = sp, 
+            receiver = receiver, 
+            amt = 0, 
+            index = asset
+        )
+
         transaction.assign_group_id([optin_txn])
         signed_optin = optin_txn.sign(sender.getPrivateKey())
         client.send_transactions([signed_optin])
         resp = self.waitForTransaction(client, signed_optin.get_txid())
-        pprint.pprint(resp.__dict__)
+        self.asset_cache[receiver][asset] = True
 
     def parseVAA(self, vaa):
 #        print (vaa.hex())
@@ -699,8 +721,12 @@ class PortalCore:
                 )
             )
 
-            print ("opting in")
-            self.asset_optin(client, sender, foreign_assets[0])
+            # The receiver needs to be optin in to receive the coins... Yeah, the relayer pays for this
+            self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
+
+            # And this is how the relayer gets paid...
+            if (p["Fee"] != self.zeroPadBytes:
+                self.asset_optin(client, sender, foreign_assets[0], sender.getAddress())
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
@@ -731,10 +757,6 @@ class PortalCore:
             fees.append(response.__dict__["txn"]["txn"]["fee"])
 
         pprint.pprint(fees)
-
-#        if len(response.__dict__["logs"]) > 0:
-#            pprint.pprint(response.__dict__["logs"][0].hex())
-#        pprint.pprint((len(response.logs[0]), response.logs[0].hex()))
 
     def simple_core(self):
         gt = GenTest()

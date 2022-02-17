@@ -364,12 +364,18 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # TODO: add assert that the first 24 bytes are zero
             Fee.store(           Btoi(Extract(Txn.application_args[1], off.load() + Int(125),Int(8)))),  # uint256
 
+            # Gonna pay for the fee transfer?
+            If(Fee.load() > Int(0), Assert(Gtxn[Txn.group_index() - Int(1)].amount() >= Int(2000))),
+
             # Lets see if we've seen this asset before
             asset.store(Btoi(blob.read(Int(3), Int(0), Int(8)))),
 
             # This a reasonable assert
             Assert(And(
-                # would they ever be different?
+                # would they ever be different?  I am thinking they
+                # would be different if we are receiving a transfer of
+                # wrapped coins from a different exchange...  I would
+                # guess this is a best assert?
                 OriginChain.load() == Chain.load(),
                 # Directed at this chain?
                 DestChain.load() == Int(8),
@@ -387,11 +393,24 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                      TxnField.xfer_asset: asset.load(),
                      TxnField.asset_amount: Amount.load(),
                      TxnField.asset_receiver: Destination.load(),
+                     # Do we need to set the fee to 1000?
                  }
             ),
             InnerTxnBuilder.Submit(),
 
-            Log(Bytes("transfer")),
+            If(Fee.load() > Int(0), Seq([
+                    InnerTxnBuilder.Begin(),
+                    InnerTxnBuilder.SetFields(
+                        {
+                            TxnField.type_enum: TxnType.AssetTransfer,
+                            TxnField.xfer_asset: asset.load(),
+                            TxnField.asset_amount: Fee.load(),
+                            TxnField.asset_receiver: Txn.sender(),
+                            # Do we need to set the fee to 1000?
+                        }
+                    ),
+                    InnerTxnBuilder.Submit(),
+            ])
 
             Approve()
         ])
