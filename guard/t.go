@@ -4,7 +4,6 @@ package main
 import (
        "time"
        "context"
-       "encoding/json"
        "fmt"
 
        "github.com/algorand/go-algorand-sdk/client/v2/indexer"
@@ -17,7 +16,6 @@ func main() {
      indexerClient, err := indexer.MakeClient(indexerAddress, indexerToken)
      _ = err
 
-
      // Parameters
      var notePrefix = "publishMessage"
      var next_round uint64 = 24
@@ -28,8 +26,12 @@ func main() {
              result, err := indexerClient.SearchForTransactions().NotePrefix([]byte(notePrefix)).MinRound(next_round).NextToken(nextToken).Do(context.Background())
              _ = err
 
-             JSON, err := json.Marshal(result)
-             fmt.Printf(string(JSON) + "\n")
+             for i := 0; i < len(result.Transactions); i++ {
+                var t = result.Transactions[i].ApplicationTransaction
+                if string(t.ApplicationArgs[0]) == "publishMessage" {
+                    fmt.Printf(string(t.ApplicationArgs[1]) + "\n")
+                }
+             }   
 
              if result.NextToken != "" {
                  nextToken = result.NextToken
