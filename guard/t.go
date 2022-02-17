@@ -32,6 +32,7 @@ func main() {
 //                fmt.Printf(string(JSON))
 
                 var t = result.Transactions[i].ApplicationTransaction
+                fmt.Printf("%d\n", t.ApplicationId)
                 if string(t.ApplicationArgs[0]) == "publishMessage" { // The note filter is effectively the same thing
                     var vaa = t.ApplicationArgs[1]
                     fmt.Printf(result.Transactions[i].Sender + " -> " + string(vaa) + "\n")
