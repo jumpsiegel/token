@@ -4,13 +4,13 @@ go 1.17
 
 require (
 	github.com/algorand/go-algorand v0.0.0-20220216190355-cbf1939eeb26
+	github.com/algorand/go-algorand-sdk v1.12.0
 	github.com/algorand/indexer v0.0.0-20220216193933-3cafaad3c2c6
 	github.com/sirupsen/logrus v1.6.0
 )
 
 require (
 	github.com/algorand/falcon v0.0.0-20220130164023-c9e1d466f123 // indirect
-	github.com/algorand/go-algorand-sdk v1.12.0 // indirect
 	github.com/algorand/go-codec/codec v1.1.7 // indirect
 	github.com/algorand/go-deadlock v0.2.1 // indirect
 	github.com/algorand/go-sumhash v0.0.0-20211021081112-0ea867c5153a // indirect

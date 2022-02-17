@@ -363,6 +363,30 @@ class PortalCore:
 
         return sig_addr
 
+    def publishMessage(self, client, sender, vaa):
+        txns = []
+        sp = client.suggested_params()
+
+        txns.append(transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=self.coreid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"publishMessage", vaa],
+            note = b"publishMessage",
+            sp=sp
+        ))
+
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        resp = self.waitForTransaction(client, grp[-1].get_txid())
+        pprint.pprint(resp.__dict__)
+
     def asset_optin(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
             self.asset_cache[receiver] = {}
@@ -798,6 +822,10 @@ class PortalCore:
 
         bal = self.getBalances(client, player.getAddress())
         pprint.pprint(bal)
+
+        #print("Sending a vaa")
+        #self.publishMessage(client, player, b"hi mom")
+        #sys.exit(0)
 
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
