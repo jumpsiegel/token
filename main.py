@@ -823,9 +823,8 @@ class PortalCore:
         bal = self.getBalances(client, player.getAddress())
         pprint.pprint(bal)
 
-        #print("Sending a vaa")
-        #self.publishMessage(client, player, b"hi mom")
-        #sys.exit(0)
+        print("Sending a vaa")
+        self.publishMessage(client, player, b"you suck")
 
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))

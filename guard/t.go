@@ -5,7 +5,7 @@ import (
        "time"
        "context"
        "fmt"
-
+//       "encoding/json"
        "github.com/algorand/go-algorand-sdk/client/v2/indexer"
 )
 
@@ -18,7 +18,7 @@ func main() {
 
      // Parameters
      var notePrefix = "publishMessage"
-     var next_round uint64 = 24
+     var next_round uint64 = 0
 
      for true {
          var nextToken = ""
@@ -27,9 +27,14 @@ func main() {
              _ = err
 
              for i := 0; i < len(result.Transactions); i++ {
+//                JSON, err := json.MarshalIndent(result.Transactions[i], ",", " ")
+//                _ = err
+//                fmt.Printf(string(JSON))
+
                 var t = result.Transactions[i].ApplicationTransaction
-                if string(t.ApplicationArgs[0]) == "publishMessage" {
-                    fmt.Printf(string(t.ApplicationArgs[1]) + "\n")
+                if string(t.ApplicationArgs[0]) == "publishMessage" { // The note filter is effectively the same thing
+                    var vaa = t.ApplicationArgs[1]
+                    fmt.Printf(result.Transactions[i].Sender + " -> " + string(vaa) + "\n")
                 }
              }   
 
