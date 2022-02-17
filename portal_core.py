@@ -118,6 +118,9 @@ def getCoreContracts(   client: AlgodClient,
         def nop():
             return Seq([Approve()])
 
+        def publishMessage():
+            return Seq([Approve()])
+
         def hdlGovernance():
             off = ScratchVar()
             a = ScratchVar()
@@ -377,6 +380,7 @@ def getCoreContracts(   client: AlgodClient,
         on_delete = Seq([Reject()])
 
         router = Cond(
+            [METHOD == Bytes("publishMessage"), publishMessage()],
             [METHOD == Bytes("nop"), nop()],
             [METHOD == Bytes("init"), init()],
             [METHOD == Bytes("verifySigs"), verifySigs()],
