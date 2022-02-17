@@ -262,6 +262,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
                         TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
+                        # Do we want to burn/mint instead of just
+                        # having a reserve?  Sure is easier to just
+                        # have a reserve...
                         TxnField.config_asset_total: Int(int(1e17)),
                         TxnField.config_asset_decimals: Decimals.load(),
                         TxnField.config_asset_manager: me,
