@@ -192,6 +192,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     
         Address = ScratchVar()
         Chain = ScratchVar()
+        FromChain = ScratchVar()
         Decimals = ScratchVar()
         Symbol = ScratchVar()
         Name = ScratchVar()
@@ -237,8 +238,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Assert(Int(2) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
             Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
     
-            # Has the nice effect of ALSO testing we are looking at the correct object..
-            Assert(Chain.load()== Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
+            FromChain.store(      Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
             Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
@@ -250,7 +250,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
             #   This confirms the user gave us access to the correct memory for this asset..
-            Assert(Txn.accounts[3] == get_sig_address(Chain.load(), Address.load())),
+            Assert(Txn.accounts[3] == get_sig_address(FromChain.load(), Address.load())),
 
             # Lets see if we've seen this asset before
             asset.store(blob.read(Int(3), Int(0), Int(8))),
@@ -269,7 +269,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         TxnField.config_asset_clawback: me,
                         TxnField.config_asset_reserve: me,
                         # TODO: It would be really nice if we could do base encoding... can that be done in pyteal?
-                        TxnField.config_asset_url: Concat(Itob(Chain.load()), Address.load()),
+                        TxnField.config_asset_url: Concat(Itob(FromChain.load()), Address.load()),
                         TxnField.fee: Int(0),
                     }
                 ),
@@ -281,7 +281,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 buf.store(extract_url(Btoi(asset.load()))),
                 c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
                 a.store(Extract(buf.load(), Int(8), Int(32))),
-                Assert(And(c.load() == Chain.load(), a.load() == Address.load())),
+                Assert(And(c.load() == FromChain.load(), a.load() == Address.load())),
 
                 a.store(Btoi(asset.load())),
 
