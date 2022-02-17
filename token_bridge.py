@@ -304,6 +304,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Approve()
         ])
 
+    # TODO: receiving algorand native coins...
     def receiveTransfer():
         me = Global.current_application_address()
         off = ScratchVar()
@@ -370,13 +371,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Lets see if we've seen this asset before
             asset.store(Btoi(blob.read(Int(3), Int(0), Int(8)))),
 
-            # This a reasonable assert
             Assert(And(
-                # would they ever be different?  I am thinking they
-                # would be different if we are receiving a transfer of
-                # wrapped coins from a different exchange...  I would
-                # guess this is a best assert?
-                OriginChain.load() == Chain.load(),
                 # Directed at this chain?
                 DestChain.load() == Int(8),
                 # This a asset we know about?
@@ -481,36 +476,3 @@ def get_token_bridge(client: AlgodClient, seed_amt: int = 0, tmpl_sig: TmplSig =
     CLEAR_STATE_PROGRAM = fullyCompileContract(client, clear_token_bridge())
 
     return APPROVAL_PROGRAM, CLEAR_STATE_PROGRAM
-
-
-#     @Subroutine(TealType.none)
-#     def axfer(reciever: TealType.bytes, aid: TealType.uint64, amt: TealType.uint64):
-#         return Seq(
-#             InnerTxnBuilder.Begin(),
-#             InnerTxnBuilder.SetFields(
-#                 {
-#                     TxnField.type_enum: TxnType.AssetTransfer,
-#                     TxnField.xfer_asset: aid,
-#                     TxnField.asset_amount: amt,
-#                     TxnField.asset_receiver: reciever,
-#                     TxnField.fee: Int(0),
-#                 }
-#             ),
-#             InnerTxnBuilder.Submit(),
-#         )
-# 
-#     @Subroutine(TealType.none)
-#     def pay(receiver: TealType.bytes, amt: TealType.uint64):
-#         return Seq(
-#             InnerTxnBuilder.Begin(),
-#             InnerTxnBuilder.SetFields(
-#                 {
-#                     TxnField.type_enum: TxnType.Payment,
-#                     TxnField.amount: amt,
-#                     TxnField.receiver: receiver,
-#                     TxnField.fee: Int(0),
-#                 }
-#             ),
-#             InnerTxnBuilder.Submit(),
-#         )
-# 
