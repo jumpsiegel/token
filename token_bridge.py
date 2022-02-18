@@ -313,7 +313,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6)), # The # offset to the digest
             buf.store(Txn.application_args[1]),
-            Pop(blob.write(Int(3), Int(8), Extract(buf.load() off.load(), len(buf.load()) - off.load()))),
+            Pop(blob.write(Int(3), Int(8), Extract(buf.load(), off.load(), Len(buf.load()) - off.load()))),
 
             Approve()
         ])
