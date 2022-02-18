@@ -281,6 +281,11 @@ class PortalCore:
         response = self.waitForTransaction(client, signedTxn.get_txid())
         assert response.applicationIndex is not None and response.applicationIndex > 0
 
+        # Lets give it a bit of money so that it is not a "ghost" account
+        txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = client.suggested_params(), receiver = get_application_address(response.applicationIndex), amt = 100000)
+        signedTxn = txn.sign(sender.getPrivateKey())
+        client.send_transaction(signedTxn)
+
         return response.applicationIndex
 
     def createTokenBridgeApp(
@@ -294,7 +299,7 @@ class PortalCore:
         localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
     
         app_args = [self.coreid]
-    
+
         txn = transaction.ApplicationCreateTxn(
             sender=sender.getAddress(),
             on_complete=transaction.OnComplete.NoOpOC,
@@ -313,6 +318,11 @@ class PortalCore:
     
         response = self.waitForTransaction(client, signedTxn.get_txid())
         assert response.applicationIndex is not None and response.applicationIndex > 0
+
+        # Lets give it a bit of money so that it is not a "ghost" account
+        txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = client.suggested_params(), receiver = get_application_address(response.applicationIndex), amt = 100000)
+        signedTxn = txn.sign(sender.getPrivateKey())
+        client.send_transaction(signedTxn)
 
         return response.applicationIndex
 
@@ -363,19 +373,22 @@ class PortalCore:
 
         return sig_addr
 
-    def publishMessage(self, client, sender, vaa):
+    def publishMessage(self, client, sender, vaa, appid):
         txns = []
         sp = client.suggested_params()
 
-        txns.append(transaction.ApplicationCallTxn(
+        a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
-            index=self.coreid,
+            index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"publishMessage", vaa],
-            note = b"publishMessage",
+            app_args=[b"test1", vaa],
+            foreign_apps = [self.coreid],
             sp=sp
-        ))
+        )
 
+        a.fee = a.fee * 2
+
+        txns.append(a)
         transaction.assign_group_id(txns)
 
         grp = []
@@ -385,7 +398,6 @@ class PortalCore:
 
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
-        pprint.pprint(resp.__dict__)
 
     def asset_optin(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
@@ -824,9 +836,6 @@ class PortalCore:
         bal = self.getBalances(client, player.getAddress())
         pprint.pprint(bal)
 
-        print("Sending a vaa")
-        self.publishMessage(client, player, b"you suck")
-
         print("upgrading the the guardian set using untrusted account...")
         upgradeVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
         self.submitVAA(upgradeVAA, client, player)
@@ -838,6 +847,12 @@ class PortalCore:
 
         print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
+        print("token bridge address" + get_application_address(self.tokenid))
+
+        print("Sending a vaa")#
+#        self.publishMessage(client, player, b"you suck", self.coreid)
+        self.publishMessage(client, player, b"you also suck", self.tokenid)
+        sys.exit(0)
 
         for r in range(1, 6):
             print("Registering chain " + str(r))

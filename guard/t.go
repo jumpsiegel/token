@@ -5,12 +5,30 @@ import (
        "time"
        "context"
        "fmt"
-//       "encoding/json"
+       "encoding/json"
        "github.com/algorand/go-algorand-sdk/client/v2/indexer"
+       "github.com/algorand/go-algorand-sdk/client/v2/common/models"
 )
 
 const indexerAddress = "http://localhost:8980"
 const indexerToken = ""
+
+func lookAtTxn(t models.Transaction) {
+  var at = t.ApplicationTransaction
+  if len(at.ApplicationArgs) == 0 {
+    return
+  }
+
+  JSON, err := json.Marshal(t)
+  _ = err
+  fmt.Printf(string(JSON))
+
+  fmt.Printf("%d\n", at.ApplicationId)
+  if string(at.ApplicationArgs[0]) == "publishMessage" { // The note filter is effectively the same thing
+      var vaa = at.ApplicationArgs[1]
+      fmt.Printf(t.Sender + " -> " + string(vaa) + "\n")
+  }
+}
 
 func main() {
      indexerClient, err := indexer.MakeClient(indexerAddress, indexerToken)
@@ -27,17 +45,15 @@ func main() {
              _ = err
 
              for i := 0; i < len(result.Transactions); i++ {
-//                JSON, err := json.MarshalIndent(result.Transactions[i], ",", " ")
-//                _ = err
-//                fmt.Printf(string(JSON))
-
-                var t = result.Transactions[i].ApplicationTransaction
-                fmt.Printf("%d\n", t.ApplicationId)
-                if string(t.ApplicationArgs[0]) == "publishMessage" { // The note filter is effectively the same thing
-                    var vaa = t.ApplicationArgs[1]
-                    fmt.Printf(result.Transactions[i].Sender + " -> " + string(vaa) + "\n")
+                var t = result.Transactions[i]
+                if len(t.InnerTxns) > 0 {
+                    for q := 0; q < len(t.InnerTxns); q++ {
+                      lookAtTxn(t.InnerTxns[q])
+                    }
+                } else {
+                  lookAtTxn(t)
                 }
-             }   
+           }
 
              if result.NextToken != "" {
                  nextToken = result.NextToken
