@@ -52,7 +52,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     
     
     @Subroutine(TealType.bytes)
-    def encode_uvarint(val: TealType.uint64, b: TealType.bytes):
+    def encode_uvarint(val: Expr, b: Expr):
         buff = ScratchVar()
         return Seq(
             buff.store(b),
@@ -70,7 +70,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         )
 
     @Subroutine(TealType.bytes)
-    def trim_bytes(str: TealType.bytes):
+    def trim_bytes(str: Expr):
         len = ScratchVar()
         off = ScratchVar()
         zero = ScratchVar()
@@ -94,7 +94,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         ])
 
     @Subroutine(TealType.bytes)
-    def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
+    def get_sig_address(acct_seq_start: Expr, emitter: Expr):
         # We could iterate over N items and encode them for a more general interface
         # but we inline them directly here
                 
@@ -245,16 +245,20 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             # Due to constrains on some supported chains, all token amounts passed through the token bridge are truncated to a maximum of 8 decimals.
             # 
-            # Any chains implementation must make sure that of any token only ever MaxUint64 units (post-shifting) are bridged into the wormhole network at any given time (all target chains combined), even tough the slot is 32 bytes long (theoretically fitting uint256).
+            # Any chains implementation must make sure that of any
+            # token only ever MaxUint64 units (post-shifting) are
+            # bridged into the wormhole network at any given time (all
+            # target chains combined), even tough the slot is 32 bytes
+            # long (theoretically fitting uint256). 
             If(Decimals.load() > Int(8), Decimals.store(Int(8))),
 
-            # This pass?!  Actually kind of shocked....  maybe I know what I am doing?!
             #   This confirms the user gave us access to the correct memory for this asset..
             Assert(Txn.accounts[3] == get_sig_address(FromChain.load(), Address.load())),
 
             # Lets see if we've seen this asset before
             asset.store(blob.read(Int(3), Int(0), Int(8))),
 
+            # New asset
             If(asset.load() == Itob(Int(0))).Then(Seq([
                 InnerTxnBuilder.Begin(),
                 InnerTxnBuilder.SetFields(
@@ -304,6 +308,13 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 InnerTxnBuilder.Submit(),
             ])),
     
+            # We save away the entire digest that created this asset in case we ever need to reproduce it while sending this
+            # coin to another chain
+
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6)), # The # offset to the digest
+            buf.store(Txn.application_args[1]),
+#            Pop(blob.write(Int(3), Int(8), Extract(Txn.application_args[1], off.load(), len(Txn.application_args[1]) - off.load()))),
+
             Approve()
         ])
 

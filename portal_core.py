@@ -34,7 +34,7 @@ max_bytes = max_bytes_per_key * max_keys
 max_bits = bits_per_byte * max_bytes
 
 def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
-    teal = compileTeal(contract, mode=Mode.Application, version=5)
+    teal = compileTeal(contract, mode=Mode.Application, version=6)
     response = client.compile(teal)
     return response
 
@@ -47,7 +47,7 @@ def getCoreContracts(   client: AlgodClient,
         blob = LocalBlob()
 
         @Subroutine(TealType.bytes)
-        def encode_uvarint(val: TealType.uint64, b: TealType.bytes):
+        def encode_uvarint(val: Expr, b: Expr):
             buff = ScratchVar()
             return Seq(
                 buff.store(b),
@@ -65,7 +65,7 @@ def getCoreContracts(   client: AlgodClient,
             )
 
         @Subroutine(TealType.bytes)
-        def get_sig_address(acct_seq_start: TealType.uint64, emitter: TealType.bytes):
+        def get_sig_address(acct_seq_start: Expr, emitter: Expr):
             # We could iterate over N items and encode them for a more general interface
             # but we inline them directly here
     
