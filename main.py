@@ -693,6 +693,7 @@ class PortalCore:
                 app_args=[b"governance", vaa],
                 accounts=accts,
                 note = p["digest"],
+                foreign_apps = [self.coreid],
                 sp=sp
             ))
 

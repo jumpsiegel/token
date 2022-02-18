@@ -49,6 +49,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         maybe = AssetParam.url(id)
     
         return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
+
+    @Subroutine(TealType.bytes)
+    def governanceSet() -> Expr:
+        maybe = App.globalGetEx(App.globalGet(Bytes("coreid")), Bytes("currentGuardianSetIndex"))
+    
+        return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
     
     
     @Subroutine(TealType.bytes)
@@ -124,9 +130,18 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         targetChain = ScratchVar()
         chain = ScratchVar()
         emitter = ScratchVar()
+        set = ScratchVar()
+        idx = ScratchVar()
+
     
         return Seq([
-            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the chain
+            # All governance must be done with the most recent guardian set...
+            set.store(governanceSet()),
+            idx.store(Extract(Txn.application_args[1], Int(1), Int(4))),
+            Assert(idx.load() == set.load()),
+
+            # The offset of the chain
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), 
 
             Assert(And(
                 # Did verifyVAA pass?
