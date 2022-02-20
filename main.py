@@ -373,7 +373,13 @@ class PortalCore:
 
         return sig_addr
 
+    def parseSeqFromLog(self, txn):
+        return int.from_bytes(b64decode(txn.innerTxns[0]["logs"][0]), "big")
+
     def publishMessage(self, client, sender, vaa, appid):
+        aa = decode_address(get_application_address(appid)).hex()
+        emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
+
         txns = []
         sp = client.suggested_params()
 
@@ -383,6 +389,7 @@ class PortalCore:
             on_complete=transaction.OnComplete.NoOpOC,
             app_args=[b"test1", vaa],
             foreign_apps = [self.coreid],
+            accounts=[emitter_addr],
             sp=sp
         )
 
@@ -398,6 +405,7 @@ class PortalCore:
 
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
+        pprint.pprint(self.parseSeqFromLog(resp))
 
     def asset_optin(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
@@ -849,9 +857,10 @@ class PortalCore:
         self.tokenid = self.createTokenBridgeApp(client, foundation)
         print("token bridge address" + get_application_address(self.tokenid))
 
-        print("Sending a vaa")#
+        print("Sending a vaa... do not let this test go into production")#
 #        self.publishMessage(client, player, b"you suck", self.coreid)
         self.publishMessage(client, player, b"you also suck", self.tokenid)
+        self.publishMessage(client, player, b"second suck", self.tokenid)
         sys.exit(0)
 
         for r in range(1, 6):

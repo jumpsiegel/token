@@ -440,7 +440,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         ])
 
     def test1():
-        # Look! a proxy contract!
+        # Look! a proxy contract!  do NOT let this test go into production
         return Seq(
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
@@ -448,6 +448,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                     TxnField.type_enum: TxnType.ApplicationCall,
                     TxnField.application_id: App.globalGet(Bytes("coreid")),
                     TxnField.application_args: [Bytes("publishMessage"), Txn.application_args[1]],
+                    TxnField.accounts: [Txn.accounts[1]],
                     TxnField.note: Bytes("publishMessage"),
                     TxnField.fee: Int(0),
                 }

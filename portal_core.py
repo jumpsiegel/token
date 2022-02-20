@@ -119,7 +119,21 @@ def getCoreContracts(   client: AlgodClient,
             return Seq([Approve()])
 
         def publishMessage():
-            return Seq([Approve()])
+            seq = ScratchVar()
+
+            return Seq([
+                # Lets see if we were handed the correct account to store the sequence number in
+                Assert(Txn.accounts[1] == get_sig_address(Int(0), Txn.sender())),
+
+                # emitter sequence number
+                seq.store(Itob(Btoi(blob.read(Int(1), Int(0), Int(8))) + Int(1))),
+                Pop(blob.write(Int(1), Int(0), seq.load())),
+
+                # Log it so that we can look for this on the guardian network
+                Log(seq.load()),
+                
+                Approve()
+            ])
 
         def hdlGovernance():
             off = ScratchVar()
