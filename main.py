@@ -358,7 +358,9 @@ class PortalCore:
                 # Create it
                 sp = client.suggested_params()
     
-                seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt)
+                seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt
+#                                                  , rekey_to = get_application_address(app_id)
+                                                  )
                 optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
     
                 transaction.assign_group_id([seed_txn, optin_txn])
