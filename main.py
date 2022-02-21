@@ -340,10 +340,14 @@ class PortalCore:
         return False
 
     def optin(self, client, sender, app_id, idx, emitter, doCreate=True):
+        # aa = decode_address(get_application_address(app_id)).hex()
+        aa = "00"*32
+
         lsa = self.tsig.populate(
             {
                 "TMPL_SEED_AMT": self.seed_amt,
                 "TMPL_APP_ID": app_id,
+                "TMPL_APP_ADDRESS": aa,
                 "TMPL_ADDR_IDX": idx,
                 "TMPL_EMITTER_ID": emitter,
             }
@@ -358,9 +362,11 @@ class PortalCore:
                 # Create it
                 sp = client.suggested_params()
     
-                seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = sp, receiver = sig_addr, amt = self.seed_amt
-#                                                  , rekey_to = get_application_address(app_id)
-                                                  )
+                seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), 
+                                                  sp = sp, 
+                                                  receiver = sig_addr, 
+                                                  amt = self.seed_amt, 
+                                                  rekey_to = get_application_address(app_id))
                 optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
     
                 transaction.assign_group_id([seed_txn, optin_txn])

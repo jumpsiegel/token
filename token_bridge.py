@@ -103,7 +103,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     def get_sig_address(acct_seq_start: Expr, emitter: Expr):
         # We could iterate over N items and encode them for a more general interface
         # but we inline them directly here
-                
+
         return Sha512_256(
             Concat(
                 Bytes("Program"),
@@ -117,10 +117,15 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 # SEED_AMT
                 tmpl_sig.get_bytecode_chunk(2),
                 encode_uvarint(Int(seed_amt), Bytes("")),
-                # APP_ID
+                # TMPL_APP_ADDRESS
                 tmpl_sig.get_bytecode_chunk(3),
-                encode_uvarint(Global.current_application_id(), Bytes("")),
+                encode_uvarint(Len(Global.current_application_address()), Bytes("")),
+#                Global.current_application_address(),
+                Global.zero_address(),
+                # APP_ID
                 tmpl_sig.get_bytecode_chunk(4),
+                encode_uvarint(Global.current_application_id(), Bytes("")),
+                tmpl_sig.get_bytecode_chunk(5),
             )
         )
 

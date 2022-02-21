@@ -82,10 +82,15 @@ def getCoreContracts(   client: AlgodClient,
                     # SEED_AMT
                     tmpl_sig.get_bytecode_chunk(2),
                     encode_uvarint(Int(seed_amt), Bytes("")),
-                    # APP_ID
+                    # TMPL_APP_ADDRESS
                     tmpl_sig.get_bytecode_chunk(3),
-                    encode_uvarint(Global.current_application_id(), Bytes("")),
+                    encode_uvarint(Len(Global.current_application_address()), Bytes("")),
+     #               Global.current_application_address(),
+                    Global.zero_address(),
+                    # APP_ID
                     tmpl_sig.get_bytecode_chunk(4),
+                    encode_uvarint(Global.current_application_id(), Bytes("")),
+                    tmpl_sig.get_bytecode_chunk(5),
                 )
             )
     
