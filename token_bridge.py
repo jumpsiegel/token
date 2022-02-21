@@ -117,14 +117,13 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 # SEED_AMT
                 tmpl_sig.get_bytecode_chunk(2),
                 encode_uvarint(Int(seed_amt), Bytes("")),
-                # TMPL_APP_ADDRESS
-                tmpl_sig.get_bytecode_chunk(3),
-                encode_uvarint(Len(Global.current_application_address()), Bytes("")),
-#                Global.current_application_address(),
-                Global.zero_address(),
                 # APP_ID
-                tmpl_sig.get_bytecode_chunk(4),
+                tmpl_sig.get_bytecode_chunk(3),
                 encode_uvarint(Global.current_application_id(), Bytes("")),
+                # TMPL_APP_ADDRESS
+                tmpl_sig.get_bytecode_chunk(4),
+                encode_uvarint(Len(Global.current_application_address()), Bytes("")),
+                Global.current_application_address(),
                 tmpl_sig.get_bytecode_chunk(5),
             )
         )

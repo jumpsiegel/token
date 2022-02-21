@@ -340,8 +340,7 @@ class PortalCore:
         return False
 
     def optin(self, client, sender, app_id, idx, emitter, doCreate=True):
-        # aa = decode_address(get_application_address(app_id)).hex()
-        aa = "00"*32
+        aa = decode_address(get_application_address(app_id)).hex()
 
         lsa = self.tsig.populate(
             {
@@ -365,16 +364,17 @@ class PortalCore:
                 seed_txn = transaction.PaymentTxn(sender = sender.getAddress(), 
                                                   sp = sp, 
                                                   receiver = sig_addr, 
-                                                  amt = self.seed_amt, 
-                                                  rekey_to = get_application_address(app_id))
+                                                  amt = self.seed_amt)
                 optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
+                rekey_txn = transaction.PaymentTxn(sender=sig_addr, sp=sp, receiver=sig_addr, amt=0, rekey_to=get_application_address(app_id))
     
-                transaction.assign_group_id([seed_txn, optin_txn])
+                transaction.assign_group_id([seed_txn, optin_txn, rekey_txn])
     
                 signed_seed = seed_txn.sign(sender.getPrivateKey())
                 signed_optin = transaction.LogicSigTransaction(optin_txn, lsa)
+                signed_rekey = transaction.LogicSigTransaction(rekey_txn, lsa)
     
-                client.send_transactions([signed_seed, signed_optin])
+                client.send_transactions([signed_seed, signed_optin, signed_rekey])
                 self.waitForTransaction(client, signed_optin.get_txid())
                 
                 self.cache[sig_addr] = True
