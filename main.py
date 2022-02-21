@@ -91,7 +91,7 @@ class PortalCore:
         self.KMD_WALLET_NAME = "unencrypted-default-wallet"
         self.KMD_WALLET_PASSWORD = ""
 
-        self.seed_amt = int(1001000)  # The black magic in this number... 
+        self.seed_amt = int(1002000)  # The black magic in this number... 
         self.cache = {}
         self.asset_cache = {}
 
