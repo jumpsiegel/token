@@ -205,7 +205,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Approve()
         ])
     
-    def attest():
+    def receiveAttest():
         me = Global.current_application_address()
         off = ScratchVar()
     
@@ -470,14 +470,26 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
     on_delete = Seq([Reject()])
 
+    def transfer():
+        return Seq([Approve()])
+
+    def transferWithPayload():
+        return Seq([Approve()])
+
+    def generateAttest():
+        return Seq([Approve()])
+
     def nop():
         return Seq([Approve()])
 
     router = Cond(
         [METHOD == Bytes("test1"), test1()],
         [METHOD == Bytes("nop"), nop()],
-        [METHOD == Bytes("attest"), attest()],
+        [METHOD == Bytes("receiveAttest"), receiveAttest()],
+        [METHOD == Bytes("generateAttest"), generateAttest()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
+        [METHOD == Bytes("transfer"), transfer()],
+        [METHOD == Bytes("transferWithPayload"), transferWithPayload()],
         [METHOD == Bytes("governance"), governance()],
     )
 

@@ -757,7 +757,7 @@ class PortalCore:
                 sender=sender.getAddress(),
                 index=self.tokenid,
                 on_complete=transaction.OnComplete.NoOpOC,
-                app_args=[b"attest", vaa],
+                app_args=[b"receiveAttest", vaa],
                 accounts=accts,
                 foreign_assets = foreign_assets,
                 sp=sp
@@ -813,7 +813,7 @@ class PortalCore:
 
         pprint.pprint(fees)
 
-    def simple_core(self):
+    def simple_test(self):
         gt = GenTest()
 
 #        q = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
@@ -836,7 +836,6 @@ class PortalCore:
         print("Creating the PortalCore app")
         self.coreid = self.createPortalCoreApp(client=client, sender=foundation)
         print("coreid = " + str(self.coreid))
-
 
         seq = 1
 
@@ -898,20 +897,20 @@ class PortalCore:
         self.submitVAA(transferVAA, client, player)
         seq += 1
 
-        print("foundation account: " + foundation.getAddress())
-        pprint.pprint(client.account_info(foundation.getAddress()))
-
         print("player account: " + player.getAddress())
         pprint.pprint(client.account_info(player.getAddress()))
 
-        print("core app: " + get_application_address(self.coreid))
-        pprint.pprint(client.account_info(get_application_address(self.coreid))),
-
-        print("token app: " + get_application_address(self.tokenid))
-        pprint.pprint(client.account_info(get_application_address(self.tokenid))),
-
-        print("asset app: " + chain_addr)
-        pprint.pprint(client.account_info(chain_addr))
+#        print("foundation account: " + foundation.getAddress())
+#        pprint.pprint(client.account_info(foundation.getAddress()))
+#
+#        print("core app: " + get_application_address(self.coreid))
+#        pprint.pprint(client.account_info(get_application_address(self.coreid))),
+#
+#        print("token app: " + get_application_address(self.tokenid))
+#        pprint.pprint(client.account_info(get_application_address(self.tokenid))),
+#
+#        print("asset app: " + chain_addr)
+#        pprint.pprint(client.account_info(chain_addr))
 
 core = PortalCore()
-core.simple_core()
+core.simple_test()
