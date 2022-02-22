@@ -774,15 +774,6 @@ class PortalCore:
             if (len(asset) > 8):
                 foreign_assets.append(int.from_bytes(asset[0:8], "big"))
 
-            txns.append(
-                transaction.PaymentTxn(
-                    sender = sender.getAddress(),
-                    sp = sp, 
-                    receiver = get_application_address(self.tokenid),
-                    amt = sp.min_fee
-                )
-            )
-
             # The receiver needs to be optin in to receive the coins... Yeah, the relayer pays for this
             self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
 
@@ -799,6 +790,11 @@ class PortalCore:
                 foreign_assets = foreign_assets,
                 sp=sp
             ))
+
+            if p["Fee"] != self.zeroPadBytes:
+                txns[-1].fee = txns[-1].fee * 3
+            else:
+                txns[-1].fee = txns[-1].fee * 2
 
         transaction.assign_group_id(txns)
 

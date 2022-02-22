@@ -329,7 +329,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset: a.load(),
                         TxnField.config_asset_name: Name.load(),       # TODO: Not having a effect
-                        TxnField.config_asset_unit_name: Symbol.load()
+                        TxnField.config_asset_unit_name: Symbol.load(),
+                        TxnField.fee: Int(0)
                     }
                 ),
                 InnerTxnBuilder.Submit(),
@@ -363,24 +364,17 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         return Seq([
             Assert(And(
                 # Lets see if the vaa we are about to process was actually verified by the core
-                Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
-                Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
-                Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
-                Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
-                Gtxn[Txn.group_index() - Int(2)].application_args[1] == Txn.application_args[1],
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(1)].application_id() == App.globalGet(Bytes("coreid")),
+                Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("verifyVAA"),
+                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index() - Int(1)].application_args[1] == Txn.application_args[1],
 
                 # We all opted into the same accounts?
-                Gtxn[Txn.group_index() - Int(2)].accounts[0] == Txn.accounts[0],
-                Gtxn[Txn.group_index() - Int(2)].accounts[1] == Txn.accounts[1],
-                Gtxn[Txn.group_index() - Int(2)].accounts[2] == Txn.accounts[2],
-    
-                # Did the user pay us to do the transfer?
-                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
-                Gtxn[Txn.group_index() - Int(1)].amount() >= Int(1000),
-                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(1)].receiver() == me,
-                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index() - Int(1)].accounts[0] == Txn.accounts[0],
+                Gtxn[Txn.group_index() - Int(1)].accounts[1] == Txn.accounts[1],
+                Gtxn[Txn.group_index() - Int(1)].accounts[2] == Txn.accounts[2],
     
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
             )),
@@ -430,7 +424,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                      TxnField.xfer_asset: asset.load(),
                      TxnField.asset_amount: Amount.load(),
                      TxnField.asset_receiver: Destination.load(),
-                     # Do we need to set the fee to 1000?
+                     TxnField.fee: Int(0),
                  }
             ),
             InnerTxnBuilder.Submit(),
@@ -444,7 +438,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                             TxnField.xfer_asset: asset.load(),
                             TxnField.asset_amount: Fee.load(),
                             TxnField.asset_receiver: Txn.sender(),
-                            # Do we need to set the fee to 1000?
+                            TxnField.fee: Int(0),
                         }
                     ),
                     InnerTxnBuilder.Submit(),
