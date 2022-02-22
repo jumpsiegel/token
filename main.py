@@ -753,11 +753,6 @@ class PortalCore:
                 sp=sp
             ))
 
-            nsp = client.suggested_params()
-
-            nsp.fee = nsp.min_fee * 2  # pay for the txn on behalf of app
-            nsp.flat_fee = True
-
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.tokenid,
@@ -765,8 +760,9 @@ class PortalCore:
                 app_args=[b"attest", vaa],
                 accounts=accts,
                 foreign_assets = foreign_assets,
-                sp=nsp
+                sp=sp
             ))
+            txns[-1].fee = txns[-1].fee * 2
 
         if p["Meta"] == "TokenBridge Transfer":
             asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
@@ -791,6 +787,7 @@ class PortalCore:
                 sp=sp
             ))
 
+            # We need to cover the inner transactions
             if p["Fee"] != self.zeroPadBytes:
                 txns[-1].fee = txns[-1].fee * 3
             else:
