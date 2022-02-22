@@ -366,7 +366,8 @@ class PortalCore:
                                                   receiver = sig_addr, 
                                                   amt = self.seed_amt)
                 optin_txn = transaction.ApplicationOptInTxn(sig_addr, sp, app_id)
-                rekey_txn = transaction.PaymentTxn(sender=sig_addr, sp=sp, receiver=sig_addr, amt=0, rekey_to=get_application_address(app_id))
+                rekey_txn = transaction.PaymentTxn(sender=sig_addr, sp=sp, receiver=sig_addr, 
+                                                   amt=0, rekey_to=get_application_address(app_id))
     
                 transaction.assign_group_id([seed_txn, optin_txn, rekey_txn])
     
@@ -866,10 +867,8 @@ class PortalCore:
         print("token bridge address" + get_application_address(self.tokenid))
 
         print("Sending a vaa... do not let this test go into production")#
-#        self.publishMessage(client, player, b"you suck", self.coreid)
         self.publishMessage(client, player, b"you also suck", self.tokenid)
         self.publishMessage(client, player, b"second suck", self.tokenid)
-        sys.exit(0)
 
         for r in range(1, 6):
             print("Registering chain " + str(r))
@@ -884,6 +883,8 @@ class PortalCore:
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
         self.submitVAA(attestVAA, client, player)
         seq += 1
+
+        sys.exit(0)
 
         print("Create the same asset " + str(seq))
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USD2C", b"Circle2Coin"))
