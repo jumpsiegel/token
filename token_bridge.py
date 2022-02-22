@@ -236,7 +236,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(3)].accounts[1] == Txn.accounts[1],
                 Gtxn[Txn.group_index() - Int(3)].accounts[2] == Txn.accounts[2],
     
-                # Did the user pay us attest a new product?
+                # Did the user pay the lsig to attest a new product?
                 Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.Payment,
                 Gtxn[Txn.group_index() - Int(2)].amount() >= Int(100000),
                 Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
