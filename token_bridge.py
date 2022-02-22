@@ -238,9 +238,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     
                 # Did the user pay us attest a new product?
                 Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.Payment,
-                Gtxn[Txn.group_index() - Int(2)].amount() >= Int(200000),
+                Gtxn[Txn.group_index() - Int(2)].amount() >= Int(100000),
                 Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(2)].receiver() == me,
+                Gtxn[Txn.group_index() - Int(2)].receiver() == Txn.accounts[3],
                 Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
 
                 # We had to buy some extra CPU
@@ -289,6 +289,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 InnerTxnBuilder.Begin(),
                 InnerTxnBuilder.SetFields(
                     {
+                        TxnField.sender: Txn.accounts[3],
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
                         TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
@@ -424,6 +425,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                  {
+                     TxnField.sender: Txn.accounts[3],
                      TxnField.type_enum: TxnType.AssetTransfer,
                      TxnField.xfer_asset: asset.load(),
                      TxnField.asset_amount: Amount.load(),
@@ -437,6 +439,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                     InnerTxnBuilder.Begin(),
                     InnerTxnBuilder.SetFields(
                         {
+                            TxnField.sender: Txn.accounts[3],
                             TxnField.type_enum: TxnType.AssetTransfer,
                             TxnField.xfer_asset: asset.load(),
                             TxnField.asset_amount: Fee.load(),

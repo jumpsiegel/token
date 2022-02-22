@@ -740,8 +740,8 @@ class PortalCore:
                 transaction.PaymentTxn(
                     sender = sender.getAddress(),
                     sp = sp, 
-                    receiver = get_application_address(self.tokenid),
-                    amt = 200000
+                    receiver = chain_addr,
+                    amt = 100000
                 )
             )
 
@@ -892,7 +892,6 @@ class PortalCore:
         self.submitVAA(attestVAA, client, player)
         seq += 1
 
-        sys.exit(0)
 
         print("Create the same asset " + str(seq))
         attestVAA = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 2, seq, seq, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USD2C", b"Circle2Coin"))
@@ -903,6 +902,8 @@ class PortalCore:
         transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
         self.submitVAA(transferVAA, client, player)
         seq += 1
+
+        sys.exit(0)
 
         print("foundation account: " + foundation.getAddress())
         pprint.pprint(client.account_info(foundation.getAddress()))
