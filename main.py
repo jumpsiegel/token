@@ -745,6 +745,14 @@ class PortalCore:
                 )
             )
 
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"nop"],
+                sp=sp
+            ))
+
             nsp = client.suggested_params()
 
             nsp.fee = nsp.min_fee * 2  # pay for the txn on behalf of app

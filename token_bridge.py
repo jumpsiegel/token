@@ -224,23 +224,30 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         return Seq([
             Assert(And(
                 # Lets see if the vaa we are about to process was actually verified by the core
-                Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.ApplicationCall,
-                Gtxn[Txn.group_index() - Int(2)].application_id() == App.globalGet(Bytes("coreid")),
-                Gtxn[Txn.group_index() - Int(2)].application_args[0] == Bytes("verifyVAA"),
-                Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
-                Gtxn[Txn.group_index() - Int(2)].application_args[1] == Txn.application_args[1],
+                Gtxn[Txn.group_index() - Int(3)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(3)].application_id() == App.globalGet(Bytes("coreid")),
+                Gtxn[Txn.group_index() - Int(3)].application_args[0] == Bytes("verifyVAA"),
+                Gtxn[Txn.group_index() - Int(3)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(3)].rekey_to() == Global.zero_address(),
+                Gtxn[Txn.group_index() - Int(3)].application_args[1] == Txn.application_args[1],
 
                 # We all opted into the same accounts?
-                Gtxn[Txn.group_index() - Int(2)].accounts[0] == Txn.accounts[0],
-                Gtxn[Txn.group_index() - Int(2)].accounts[1] == Txn.accounts[1],
-                Gtxn[Txn.group_index() - Int(2)].accounts[2] == Txn.accounts[2],
+                Gtxn[Txn.group_index() - Int(3)].accounts[0] == Txn.accounts[0],
+                Gtxn[Txn.group_index() - Int(3)].accounts[1] == Txn.accounts[1],
+                Gtxn[Txn.group_index() - Int(3)].accounts[2] == Txn.accounts[2],
     
                 # Did the user pay us attest a new product?
-                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
-                Gtxn[Txn.group_index() - Int(1)].amount() >= Int(200000),
+                Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.Payment,
+                Gtxn[Txn.group_index() - Int(2)].amount() >= Int(200000),
+                Gtxn[Txn.group_index() - Int(2)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(2)].receiver() == me,
+                Gtxn[Txn.group_index() - Int(2)].rekey_to() == Global.zero_address(),
+
+                # We had to buy some extra CPU
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
+                Gtxn[Txn.group_index() - Int(1)].application_id() == Global.current_application_id(),
+                Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("nop"),
                 Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(1)].receiver() == me,
                 Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
     
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
@@ -466,8 +473,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
     on_delete = Seq([Reject()])
 
+    def nop():
+        return Seq([Approve()])
+
     router = Cond(
         [METHOD == Bytes("test1"), test1()],
+        [METHOD == Bytes("nop"), nop()],
         [METHOD == Bytes("attest"), attest()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
         [METHOD == Bytes("governance"), governance()],
