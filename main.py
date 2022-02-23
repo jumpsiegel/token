@@ -416,6 +416,68 @@ class PortalCore:
         resp = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(self.parseSeqFromLog(resp))
 
+    def testAttest(self, client, sender, asset_id):
+        creator = None
+        assets = client.account_info(sender.getAddress())["assets"]
+        for x in assets:
+            if x["asset-id"] == asset_id:
+                creator = x["creator"]
+                break
+
+        if creator == None:
+            raise Exception("unheld asset")
+
+        asset = None
+        assets = client.account_info(creator)["created-assets"]
+        for x in assets:
+            if x["index"] == asset_id:
+                asset = x["params"]
+                break
+
+        if asset == None:
+            raise Exception("creator does not know about that asset")
+
+        url = base64.b64decode(asset["url-b64"])
+        if len(url) == 40:
+            chain = int.from_bytes(url[0:8], "big")
+            address = url[8:].hex()
+            chain_addr = self.optin(client, sender, self.tokenid, chain, address, False)
+            pprint.pprint((chain_addr, creator))
+
+        sys.exit(0)
+
+        aa = decode_address(get_application_address(self.tokenid)).hex()
+        emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
+
+        txns = []
+        sp = client.suggested_params()
+
+        a = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=self.tokenid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"attestToken", asset_id],
+            foreign_apps = [self.coreid],
+            foreign_assets = [asset_id],
+            accounts=[emitter_addr],
+            sp=sp
+        )
+
+        a.fee = a.fee * 2
+
+        txns.append(a)
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        resp = self.waitForTransaction(client, grp[-1].get_txid())
+        pprint.pprint(resp.__dict__)
+        pprint.pprint(self.parseSeqFromLog(resp))
+
     def asset_optin(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
             self.asset_cache[receiver] = {}
@@ -864,7 +926,7 @@ class PortalCore:
 
         print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
-        print("token bridge address" + get_application_address(self.tokenid))
+        print("token bridge address " + get_application_address(self.tokenid))
 
         print("Sending a vaa... do not let this test go into production")#
         self.publishMessage(client, player, b"you also suck", self.tokenid)
@@ -897,8 +959,12 @@ class PortalCore:
         self.submitVAA(transferVAA, client, player)
         seq += 1
 
-        print("player account: " + player.getAddress())
-        pprint.pprint(client.account_info(player.getAddress()))
+        aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
+        print("generate an attest of the asset we just received")
+        self.testAttest(client, player, aid)
+
+#        print("player account: " + player.getAddress())
+#        pprint.pprint(client.account_info(player.getAddress()))
 
 #        print("foundation account: " + foundation.getAddress())
 #        pprint.pprint(client.account_info(foundation.getAddress()))

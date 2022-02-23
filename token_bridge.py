@@ -47,8 +47,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     @Subroutine(TealType.bytes)
     def extract_url(id) -> Expr:
         maybe = AssetParam.url(id)
-    
-        return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
+        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
 
     @Subroutine(TealType.bytes)
     def governanceSet() -> Expr:
@@ -476,8 +475,78 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     def transferWithPayload():
         return Seq([Approve()])
 
-    def generateAttest():
-        return Seq([Approve()])
+    @Subroutine(TealType.bytes)
+    def extract_name(id) -> Expr:
+        maybe = AssetParam.name(id)
+        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
+
+    @Subroutine(TealType.bytes)
+    def extract_unit_name(id) -> Expr:
+        maybe = AssetParam.unitName(id)
+        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
+
+    @Subroutine(TealType.bytes)
+    def extract_decimal(id) -> Expr:
+        maybe = AssetParam.decimals(id)
+        return Seq(maybe, If(maybe.hasValue(), Extract(Itob(maybe.value()), Int(7), Int(1)), Bytes("base16", "00")))
+
+    def attestToken():
+        p = ScratchVar()
+        zb = ScratchVar()
+        d = ScratchVar()
+        uname = ScratchVar()
+        name = ScratchVar()
+        aid = ScratchVar()
+
+        return Seq([
+            zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
+
+            aid.store(Btoi(Txn.application_args[1])),
+            d.store(extract_decimal(aid.load())),
+            uname.store(extract_unit_name(aid.load())),
+            name.store(extract_name(aid.load())),
+
+            p.store(
+                Concat(
+#PayloadID uint8 = 2
+                    Bytes("base16", "02"),
+#// Address of the token. Left-zero-padded if shorter than 32 bytes
+#TokenAddress [32]uint8
+                    Extract(zb.load(),Int(0), Int(24)),
+                    Txn.application_args[1],
+#// Chain ID of the token
+#TokenChain uint16
+                    Bytes("base16", "0008"),
+#// Number of decimals of the token
+#// (the native decimals, not truncated to 8)
+#Decimals uint8
+                    d.load(),
+#// Symbol of the token (UTF-8)
+#Symbol [32]uint8
+                    uname.load(),
+                    Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+#// Name of the token (UTF-8)
+#Name [32]uint8
+                    name.load(),
+                    Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                )
+            ),
+
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.type_enum: TxnType.ApplicationCall,
+                    TxnField.application_id: App.globalGet(Bytes("coreid")),
+                    TxnField.application_args: [Bytes("publishMessage"), p.load()],
+                    TxnField.accounts: [Txn.accounts[1]],
+                    TxnField.note: Bytes("publishMessage"),
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            Approve()
+        ])
 
     def nop():
         return Seq([Approve()])
@@ -486,7 +555,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         [METHOD == Bytes("test1"), test1()],
         [METHOD == Bytes("nop"), nop()],
         [METHOD == Bytes("receiveAttest"), receiveAttest()],
-        [METHOD == Bytes("generateAttest"), generateAttest()],
+        [METHOD == Bytes("attestToken"), attestToken()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
         [METHOD == Bytes("transfer"), transfer()],
         [METHOD == Bytes("transferWithPayload"), transferWithPayload()],
