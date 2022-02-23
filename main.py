@@ -417,6 +417,9 @@ class PortalCore:
         pprint.pprint(self.parseSeqFromLog(resp))
 
     def testAttest(self, client, sender, asset_id):
+        aa = decode_address(get_application_address(self.tokenid)).hex()
+        emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
+
         creator = None
         assets = client.account_info(sender.getAddress())["assets"]
         for x in assets:
@@ -426,25 +429,6 @@ class PortalCore:
 
         if creator == None:
             raise Exception("unheld asset")
-
-        asset = None
-        assets = client.account_info(creator)["created-assets"]
-        for x in assets:
-            if x["index"] == asset_id:
-                asset = x["params"]
-                break
-
-        if asset == None:
-            raise Exception("creator does not know about that asset")
-
-        url = base64.b64decode(asset["url-b64"])
-        if len(url) == 40:
-            chain = int.from_bytes(url[0:8], "big")
-            address = url[8:].hex()
-            chain_addr = self.optin(client, sender, self.tokenid, chain, address, False)
-            pprint.pprint((chain_addr, creator))
-
-        sys.exit(0)
 
         aa = decode_address(get_application_address(self.tokenid)).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
@@ -459,7 +443,7 @@ class PortalCore:
             app_args=[b"attestToken", asset_id],
             foreign_apps = [self.coreid],
             foreign_assets = [asset_id],
-            accounts=[emitter_addr],
+            accounts=[emitter_addr, creator],
             sp=sp
         )
 

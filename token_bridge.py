@@ -45,11 +45,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     blob = LocalBlob()
 
     @Subroutine(TealType.bytes)
-    def extract_url(id) -> Expr:
-        maybe = AssetParam.url(id)
-        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
-
-    @Subroutine(TealType.bytes)
     def governanceSet() -> Expr:
         maybe = App.globalGetEx(App.globalGet(Bytes("coreid")), Bytes("currentGuardianSetIndex"))
     
@@ -268,7 +263,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
-            # Due to constrains on some supported chains, all token amounts passed through the token bridge are truncated to a maximum of 8 decimals.
+            # Due to constrains on some supported chains, all token
+            # amounts passed through the token bridge are truncated to
+            # a maximum of 8 decimals. 
             # 
             # Any chains implementation must make sure that of any
             # token only ever MaxUint64 units (post-shifting) are
@@ -282,6 +279,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             # Lets see if we've seen this asset before
             asset.store(blob.read(Int(3), Int(0), Int(8))),
+
+            # The # offset to the digest
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6)), 
 
             # New asset
             If(asset.load() == Itob(Int(0))).Then(Seq([
@@ -301,8 +301,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         TxnField.config_asset_freeze: me,
                         TxnField.config_asset_clawback: me,
                         TxnField.config_asset_reserve: me,
-                        # TODO: It would be really nice if we could do base encoding... can that be done in pyteal?
-                        TxnField.config_asset_url: Concat(Itob(FromChain.load()), Address.load()),
                         TxnField.fee: Int(0),
                     }
                 ),
@@ -311,12 +309,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 asset.store(Itob(InnerTxn.created_asset_id())),
                 Pop(blob.write(Int(3), Int(0), asset.load())),
             ])).Else(Seq([
-                buf.store(extract_url(Btoi(asset.load()))),
-                c.store(Btoi(Extract(buf.load(), Int(0), Int(8)))),
-                a.store(Extract(buf.load(), Int(8), Int(32))),
-                Assert(And(c.load() == FromChain.load(), a.load() == Address.load())),
-
-                a.store(Btoi(asset.load())),
+                Assert(And(
+                    # Same address?
+                    blob.read(Int(3), Int(60), Int(92)) == Address.load(),
+                    # Same chain
+                    Btoi(blob.read(Int(3), Int(92), Int(94))) == Chain.load()
+                )),
 
                 # I've been told we are supposted to update the name if we see it a second time
                 Name.store(trim_bytes(Name.load())),
@@ -326,9 +324,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 InnerTxnBuilder.SetFields(
                     {
                         TxnField.type_enum: TxnType.AssetConfig,
-                        TxnField.config_asset: a.load(),
-                        TxnField.config_asset_name: Name.load(),       # TODO: Not having a effect
-                        TxnField.config_asset_unit_name: Symbol.load(),
+                        TxnField.config_asset: Btoi(asset.load()),
+                        TxnField.config_asset_name: trim_bytes(Name.load()),       # TODO: Not having a effect
+                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()),
                         TxnField.fee: Int(0)
                     }
                 ),
@@ -338,7 +336,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # We save away the entire digest that created this asset in case we ever need to reproduce it while sending this
             # coin to another chain
 
-            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6)), # The # offset to the digest
             buf.store(Txn.application_args[1]),
             Pop(blob.write(Int(3), Int(8), Extract(buf.load(), off.load(), Len(buf.load()) - off.load()))),
 
@@ -491,6 +488,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         return Seq(maybe, If(maybe.hasValue(), Extract(Itob(maybe.value()), Int(7), Int(1)), Bytes("base16", "00")))
 
     def attestToken():
+        asset = ScratchVar()
         p = ScratchVar()
         zb = ScratchVar()
         d = ScratchVar()
@@ -499,34 +497,33 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         aid = ScratchVar()
 
         return Seq([
+            # Lets see if we've seen this asset before
+            asset.store(blob.read(Int(2), Int(0), Int(8))),
+            Assert(Txn.application_args[1] == asset.load()),
+
             zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
 
             aid.store(Btoi(Txn.application_args[1])),
+
             d.store(extract_decimal(aid.load())),
             uname.store(extract_unit_name(aid.load())),
             name.store(extract_name(aid.load())),
 
             p.store(
                 Concat(
-#PayloadID uint8 = 2
+                    #PayloadID uint8 = 2
                     Bytes("base16", "02"),
-#// Address of the token. Left-zero-padded if shorter than 32 bytes
-#TokenAddress [32]uint8
+                    #TokenAddress [32]uint8
                     Extract(zb.load(),Int(0), Int(24)),
                     Txn.application_args[1],
-#// Chain ID of the token
-#TokenChain uint16
+                    #TokenChain uint16
                     Bytes("base16", "0008"),
-#// Number of decimals of the token
-#// (the native decimals, not truncated to 8)
-#Decimals uint8
+                    #Decimals uint8
                     d.load(),
-#// Symbol of the token (UTF-8)
-#Symbol [32]uint8
+                    #Symbol [32]uint8
                     uname.load(),
                     Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-#// Name of the token (UTF-8)
-#Name [32]uint8
+                    #Name [32]uint8
                     name.load(),
                     Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
                 )
