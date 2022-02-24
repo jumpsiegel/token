@@ -31,6 +31,8 @@ from algosdk.future.transaction import LogicSig
 
 from token_bridge import get_token_bridge
 
+from test_app import get_test_app
+
 import pprint
 
 max_keys = 16
@@ -326,6 +328,38 @@ class PortalCore:
 
         return response.applicationIndex
 
+    def createTestApp(
+        self,
+        client: AlgodClient,
+        sender: Account,
+    ) -> int:
+        approval, clear = get_test_app(client)
+
+        globalSchema = transaction.StateSchema(num_uints=4, num_byte_slices=30)
+        localSchema = transaction.StateSchema(num_uints=0, num_byte_slices=16)
+    
+        app_args = []
+
+        txn = transaction.ApplicationCreateTxn(
+            sender=sender.getAddress(),
+            on_complete=transaction.OnComplete.NoOpOC,
+            approval_program=b64decode(approval["result"]),
+            clear_program=b64decode(clear["result"]),
+            global_schema=globalSchema,
+            local_schema=localSchema,
+            app_args=app_args,
+            sp=client.suggested_params(),
+        )
+    
+        signedTxn = txn.sign(sender.getPrivateKey())
+    
+        client.send_transaction(signedTxn)
+    
+        response = self.waitForTransaction(client, signedTxn.get_txid())
+        assert response.applicationIndex is not None and response.applicationIndex > 0
+
+        return response.applicationIndex
+
     def account_exists(self, client, app_id, addr):
         try:
             ai = client.account_info(addr)
@@ -415,6 +449,31 @@ class PortalCore:
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(self.parseSeqFromLog(resp))
+
+    def createTestAsset(self, client, sender):
+        txns = []
+        sp = client.suggested_params()
+
+        a = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=self.testid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"setup"],
+            sp=sp
+        )
+
+        txns.append(a)
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        resp = self.waitForTransaction(client, grp[-1].get_txid())
+        pprint.pprint(resp.__dict__)
+        return 0
 
     def testAttest(self, client, sender, asset_id):
         aa = decode_address(get_application_address(self.tokenid)).hex()
@@ -951,6 +1010,12 @@ class PortalCore:
         aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
         print("generate an attest of the asset we just received")
         self.testAttest(client, player, aid)
+
+        print("Create the test app we will use to torture ourselves using a new player")
+        player2 = self.getTemporaryAccount(client)
+        self.testid = self.createTestApp(client, player2)
+
+        self.testasset = self.createTestAsset(client, player2)
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))
