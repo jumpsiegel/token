@@ -188,7 +188,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Cond( 
                 [a.load() == Int(1), Seq([
                     targetChain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
-                    # can we really register a chain JUST for our chain?  Is this Or reasonable?
+
                     Assert(Or((targetChain.load() == Int(0)), (targetChain.load() == Int(8)))),
 
                     off.store(off.load() + Int(2)),
@@ -196,6 +196,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                     off.store(off.load() + Int(2)),
                     emitter.store(Extract(Txn.application_args[1], off.load(), Int(32))),
+
+                    # Can I only register once?  Rumor says yes
+                    Assert(App.globalGet(Concat(Bytes("Chain"), chain.load())) == Int(0)),
 
                     App.globalPut(Concat(Bytes("Chain"), chain.load()), emitter.load()),
                 ])],
@@ -263,7 +266,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
             # We coming from the correct emitter?
-            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
+            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
+                   == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
             off.store(off.load()+Int(43)),
 
@@ -393,7 +397,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
             # We coming from the correct emitter?
-            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
+            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
+                   == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
             off.store(off.load()+Int(43)),
 
