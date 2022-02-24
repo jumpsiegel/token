@@ -137,6 +137,7 @@ def getCoreContracts(   client: AlgodClient,
                 Log(seq.load()),
                 
                 Approve()
+#                Reject()
             ])
 
         def hdlGovernance():

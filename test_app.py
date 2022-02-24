@@ -91,39 +91,28 @@ def approve_app():
             ),
             InnerTxnBuilder.Submit(),
 
-            aid.store(InnerTxn.created_asset_id()),
+            aid.store(Itob(InnerTxn.created_asset_id())),
 
-            # Opt the user account in for this asset
+            App.globalPut(Bytes("asset"), aid.load()),
+            Log(aid.load()),
 
+            Approve()
+        ])
+
+    def mint():
+        return Seq([
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                  {
                      TxnField.sender: Global.current_application_address(),
                      TxnField.type_enum: TxnType.AssetTransfer,
-                     TxnField.xfer_asset: aid.load(),
-                     TxnField.asset_amount: Int(0),
-                     TxnField.asset_receiver: Txn.sender(),
-                     TxnField.fee: Int(0),
-                 }
-            ),
-            InnerTxnBuilder.Submit(),
-
-            # Send us some assets
-
-            InnerTxnBuilder.Begin(),
-            InnerTxnBuilder.SetFields(
-                 {
-                     TxnField.sender: Global.current_application_address(),
-                     TxnField.type_enum: TxnType.AssetTransfer,
-                     TxnField.xfer_asset: aid.load(),
+                     TxnField.xfer_asset: Btoi(App.globalGet(Bytes("asset"))),
                      TxnField.asset_amount: Int(1000),
                      TxnField.asset_receiver: Txn.sender(),
                      TxnField.fee: Int(0),
                  }
             ),
             InnerTxnBuilder.Submit(),
-
-            Log(Itob(aid.load())),
 
             Approve()
         ])
@@ -134,6 +123,7 @@ def approve_app():
         [METHOD == Bytes("nop"), nop()],
         [METHOD == Bytes("test1"), test1()],
         [METHOD == Bytes("setup"), setup()],
+        [METHOD == Bytes("mint"), mint()],
     )
 
     on_create = Seq( [

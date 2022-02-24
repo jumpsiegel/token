@@ -476,7 +476,7 @@ class PortalCore:
             sp=sp
         )
 
-        a.fee = a.fee * 4
+        a.fee = a.fee * 2
 
         txns.append(a)
         transaction.assign_group_id(txns)
@@ -489,7 +489,34 @@ class PortalCore:
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
         
-        return int.from_bytes(resp.__dict__["logs"][0], "big")
+        aid = int.from_bytes(resp.__dict__["logs"][0], "big")
+
+        print("Opting " + sender.getAddress() + " into " + str(aid))
+        self.asset_optin(client, sender, aid, sender.getAddress())
+
+        txns = []
+        a = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=self.testid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"mint"],
+            foreign_assets = [aid],
+            sp=sp
+        )
+
+        a.fee = a.fee * 2
+
+        txns.append(a)
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        resp = self.waitForTransaction(client, grp[-1].get_txid())
+        return aid
 
     def testAttest(self, client, sender, asset_id):
         aa = decode_address(get_application_address(self.tokenid)).hex()
@@ -990,7 +1017,7 @@ class PortalCore:
 
         print("Create the token bridge")
         self.tokenid = self.createTokenBridgeApp(client, foundation)
-        print("token bridge address " + get_application_address(self.tokenid))
+        print("token bridge " + str(self.tokenid) + " address " + get_application_address(self.tokenid))
 
 
         for r in range(1, 6):
@@ -1029,7 +1056,7 @@ class PortalCore:
         print("player2 address " + player2.getAddress())
 
         self.testid = self.createTestApp(client, player2)
-        print("testid address " + get_application_address(self.testid))
+        print("testid " + str(self.testid) + " address " + get_application_address(self.testid))
 
         print("Sending a message payload to the core contract")
         self.publishMessage(client, player2, b"you also suck", self.testid)
