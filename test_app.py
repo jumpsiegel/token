@@ -47,6 +47,24 @@ def approve_app():
     def nop():
         return Seq([Approve()])
 
+    def test1():
+        # Look! a proxy contract!  do NOT let this test go into production
+        return Seq(
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.type_enum: TxnType.ApplicationCall,
+                    TxnField.application_id: App.globalGet(Bytes("coreid")),
+                    TxnField.application_args: [Bytes("publishMessage"), Txn.application_args[1]],
+                    TxnField.accounts: [Txn.accounts[1]],
+                    TxnField.note: Bytes("publishMessage"),
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
+            Approve()
+        )
+        
     def setup():
         return Seq([
             InnerTxnBuilder.Begin(),
@@ -79,6 +97,7 @@ def approve_app():
 
     router = Cond(
         [METHOD == Bytes("nop"), nop()],
+        [METHOD == Bytes("test1"), test1()],
         [METHOD == Bytes("setup"), setup()],
     )
 

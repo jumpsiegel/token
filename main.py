@@ -430,7 +430,7 @@ class PortalCore:
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"test1", vaa],
+            app_args=[b"test1", vaa, coreid],
             foreign_apps = [self.coreid],
             accounts=[emitter_addr],
             sp=sp
@@ -987,9 +987,6 @@ class PortalCore:
         self.tokenid = self.createTokenBridgeApp(client, foundation)
         print("token bridge address " + get_application_address(self.tokenid))
 
-        print("Sending a vaa... do not let this test go into production")#
-        self.publishMessage(client, player, b"you also suck", self.tokenid)
-        self.publishMessage(client, player, b"second suck", self.tokenid)
 
         for r in range(1, 6):
             print("Registering chain " + str(r))
@@ -1025,6 +1022,10 @@ class PortalCore:
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
         self.testid = self.createTestApp(client, player2)
+
+#        print("Sending a message payload to the core contract")
+#        self.publishMessage(client, player, b"you also suck", self.testid)
+#        self.publishMessage(client, player, b"second suck", self.testid)
 
         self.testasset = self.createTestAsset(client, player2)
 
