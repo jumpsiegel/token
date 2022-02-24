@@ -358,6 +358,11 @@ class PortalCore:
         response = self.waitForTransaction(client, signedTxn.get_txid())
         assert response.applicationIndex is not None and response.applicationIndex > 0
 
+        txn = transaction.PaymentTxn(sender = sender.getAddress(), sp = client.suggested_params(), 
+                                     receiver = get_application_address(response.applicationIndex), amt = 300000)
+        signedTxn = txn.sign(sender.getPrivateKey())
+        client.send_transaction(signedTxn)
+
         return response.applicationIndex
 
     def account_exists(self, client, app_id, addr):
@@ -430,7 +435,7 @@ class PortalCore:
             sender=sender.getAddress(),
             index=appid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"test1", vaa, coreid],
+            app_args=[b"test1", vaa, self.coreid],
             foreign_apps = [self.coreid],
             accounts=[emitter_addr],
             sp=sp
@@ -1021,12 +1026,16 @@ class PortalCore:
 
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
+        print("player2 address " + player2.getAddress())
+
         self.testid = self.createTestApp(client, player2)
+        print("testid address " + get_application_address(self.testid))
 
-#        print("Sending a message payload to the core contract")
-#        self.publishMessage(client, player, b"you also suck", self.testid)
-#        self.publishMessage(client, player, b"second suck", self.testid)
-
+        print("Sending a message payload to the core contract")
+        self.publishMessage(client, player2, b"you also suck", self.testid)
+        self.publishMessage(client, player2, b"second suck", self.testid)
+        
+        print("Lets create a brand new non-wormhole asset and try to attest and send it out")
         self.testasset = self.createTestAsset(client, player2)
 
 #        print("player account: " + player.getAddress())
