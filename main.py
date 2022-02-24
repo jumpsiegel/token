@@ -476,7 +476,7 @@ class PortalCore:
             sp=sp
         )
 
-        a.fee = a.fee * 2
+        a.fee = a.fee * 4
 
         txns.append(a)
         transaction.assign_group_id(txns)
@@ -488,8 +488,8 @@ class PortalCore:
 
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
-        pprint.pprint(resp.__dict__)
-        return 0
+        
+        return int.from_bytes(resp.__dict__["logs"][0], "big")
 
     def testAttest(self, client, sender, asset_id):
         aa = decode_address(get_application_address(self.tokenid)).hex()
@@ -1037,6 +1037,14 @@ class PortalCore:
         
         print("Lets create a brand new non-wormhole asset and try to attest and send it out")
         self.testasset = self.createTestAsset(client, player2)
+        
+        print("test asset id: " + str(self.testasset))
+
+        print("player2 account: " + player2.getAddress())
+        pprint.pprint(client.account_info(player2.getAddress()))
+
+        print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
+        self.testAttest(client, player2, self.testasset)
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))

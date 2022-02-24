@@ -428,9 +428,8 @@ def getCoreContracts(   client: AlgodClient,
             [Txn.application_id() == Int(0), on_create],
             [Txn.on_completion() == OnComplete.UpdateApplication, on_update],
             [Txn.on_completion() == OnComplete.DeleteApplication, on_delete],
-#                [Txn.on_completion() == OnComplete.CloseOut, Int(0)],
-           [Txn.on_completion() == OnComplete.OptIn, on_optin],
-           [Txn.on_completion() == OnComplete.NoOp, router]
+            [Txn.on_completion() == OnComplete.OptIn, on_optin],
+            [Txn.on_completion() == OnComplete.NoOp, router]
         )
     
     def clear_state_program():

@@ -66,18 +66,21 @@ def approve_app():
         )
         
     def setup():
+        aid = ScratchVar()
+
         return Seq([
+            # Create a test asset
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                 {
-                    TxnField.sender: me,
+                    TxnField.sender: Global.current_application_address(),
                     TxnField.type_enum: TxnType.AssetConfig,
                     TxnField.config_asset_name: Bytes("TestAsset"),
                     TxnField.config_asset_unit_name: Bytes("testAsse"),
                     TxnField.config_asset_total: Int(int(1e17)),
-                    TxnField.config_asset_decimals: Int(16),
-                    TxnField.config_asset_manager: me,
-                    TxnField.config_asset_reserve: me,
+                    TxnField.config_asset_decimals: Int(10),
+                    TxnField.config_asset_manager: Global.current_application_address(),
+                    TxnField.config_asset_reserve: Global.current_application_address(),
 
                     # We cannot freeze or clawback assets... per the spirit of 
                     TxnField.config_asset_freeze: Global.zero_address(),
@@ -88,7 +91,39 @@ def approve_app():
             ),
             InnerTxnBuilder.Submit(),
 
-            Log(Itob(InnerTxn.created_asset_id())),
+            aid.store(InnerTxn.created_asset_id()),
+
+            # Opt the user account in for this asset
+
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                 {
+                     TxnField.sender: Global.current_application_address(),
+                     TxnField.type_enum: TxnType.AssetTransfer,
+                     TxnField.xfer_asset: aid.load(),
+                     TxnField.asset_amount: Int(0),
+                     TxnField.asset_receiver: Txn.sender(),
+                     TxnField.fee: Int(0),
+                 }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            # Send us some assets
+
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                 {
+                     TxnField.sender: Global.current_application_address(),
+                     TxnField.type_enum: TxnType.AssetTransfer,
+                     TxnField.xfer_asset: aid.load(),
+                     TxnField.asset_amount: Int(1000),
+                     TxnField.asset_receiver: Txn.sender(),
+                     TxnField.fee: Int(0),
+                 }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            Log(Itob(aid.load())),
 
             Approve()
         ])
