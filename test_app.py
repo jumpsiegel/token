@@ -42,12 +42,38 @@ def clear_app():
     return Int(1)
 
 def approve_app():
+    me = Global.current_application_address()
 
     def nop():
         return Seq([Approve()])
 
     def setup():
-        return Seq([Approve()])
+        return Seq([
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.sender: me,
+                    TxnField.type_enum: TxnType.AssetConfig,
+                    TxnField.config_asset_name: Bytes("TestAsset"),
+                    TxnField.config_asset_unit_name: Bytes("testAsse"),
+                    TxnField.config_asset_total: Int(int(1e17)),
+                    TxnField.config_asset_decimals: Int(16),
+                    TxnField.config_asset_manager: me,
+                    TxnField.config_asset_reserve: me,
+
+                    # We cannot freeze or clawback assets... per the spirit of 
+                    TxnField.config_asset_freeze: Global.zero_address(),
+                    TxnField.config_asset_clawback: Global.zero_address(),
+
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            Log(Itob(InnerTxn.created_asset_id())),
+
+            Approve()
+        ])
 
     METHOD = Txn.application_args[0]
 

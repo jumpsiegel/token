@@ -279,6 +279,11 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
             Name.store(                Extract(Txn.application_args[1], off.load() + Int(68), Int(32))),
 
+            # Lets trim this... seems these are limited to 7 characters
+            Symbol.store(trim_bytes(Symbol.load())),
+            If (Len(Symbol.load()) > Int(7), Symbol.store(Extract(Symbol.load(), Int(0), Int(7)))),
+            Name.store(trim_bytes(Name.load())),
+
             # Due to constrains on some supported chains, all token
             # amounts passed through the token bridge are truncated to
             # a maximum of 8 decimals. 
@@ -306,8 +311,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                     {
                         TxnField.sender: Txn.accounts[3],
                         TxnField.type_enum: TxnType.AssetConfig,
-                        TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
-                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
+                        TxnField.config_asset_name: Name.load(),
+                        TxnField.config_asset_unit_name: Symbol.load(),
                         TxnField.config_asset_total: Int(int(1e17)),
                         TxnField.config_asset_decimals: Decimals.load(),
                         TxnField.config_asset_manager: me,
@@ -341,8 +346,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                     {
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset: Btoi(asset.load()),
-                        TxnField.config_asset_name: trim_bytes(Name.load()),       # TODO: Not having a effect
-                        TxnField.config_asset_unit_name: trim_bytes(Symbol.load()),
+                        TxnField.config_asset_name: Name.load(),
+                        TxnField.config_asset_unit_name: Symbol.load(),
                         TxnField.fee: Int(0)
                     }
                 ),

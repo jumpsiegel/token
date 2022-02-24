@@ -452,8 +452,17 @@ class PortalCore:
 
     def createTestAsset(self, client, sender):
         txns = []
-        sp = client.suggested_params()
 
+        a = transaction.PaymentTxn(
+            sender = sender.getAddress(), 
+            sp = client.suggested_params(), 
+            receiver = get_application_address(self.testid), 
+            amt = 300000
+        )
+
+        txns.append(a)
+
+        sp = client.suggested_params()
         a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=self.testid,
@@ -461,6 +470,8 @@ class PortalCore:
             app_args=[b"setup"],
             sp=sp
         )
+
+        a.fee = a.fee * 2
 
         txns.append(a)
         transaction.assign_group_id(txns)
