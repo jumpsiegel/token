@@ -214,7 +214,7 @@ def getCoreContracts(   client: AlgodClient,
                 Assert(Txn.sender() == Global.creator_address()),
 
                 # You only get one shot, do not miss your chance to blow
-                Assert(App.globalGet(Bytes("booted")) != Bytes("true")),
+                Assert(App.globalGet(Bytes("booted")) == Int(0)),
                 App.globalPut(Bytes("booted"), Bytes("true")),
 
                 # This opportunity comes once in a lifetime
@@ -407,7 +407,6 @@ def getCoreContracts(   client: AlgodClient,
         )
 
         on_create = Seq( [
-            App.globalPut(Bytes("booted"), Bytes("false")),
             App.globalPut(Bytes("vphash"), Bytes("")),
             App.globalPut(Bytes("currentGuardianSetIndex"), Bytes("")),
             App.globalPut(Bytes("validUpdateApproveHash"), Bytes("")),
