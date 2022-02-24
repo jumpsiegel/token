@@ -657,7 +657,12 @@ class PortalCore:
         p = self.parseVAA(vaa)
 
         # First we need to opt into the sequence number 
-        seq_addr = self.optin(client, sender, self.coreid, int(p["sequence"] / max_bits), p["chainRaw"].hex() + p["emitter"].hex())
+        if p["Meta"] == "NewGuardianSetIndex":
+            appid = self.coreid
+        else:
+            appid = self.tokenid
+        
+        seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["chainRaw"].hex() + p["emitter"].hex())
         # And then the signatures to help us verify the vaa_s
         guardian_addr = self.optin(client, sender, self.coreid, p["index"], b"guardian".hex())
 

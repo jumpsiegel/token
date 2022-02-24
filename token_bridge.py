@@ -33,6 +33,14 @@ from local_blob import LocalBlob
 
 import sys
 
+max_keys = 16
+max_bytes_per_key = 127
+bits_per_byte = 8
+
+bits_per_key = max_bytes_per_key * bits_per_byte
+max_bytes = max_bytes_per_key * max_keys
+max_bits = bits_per_byte * max_bytes
+
 def fullyCompileContract(client: AlgodClient, contract: Expr) -> bytes:
     teal = compileTeal(contract, mode=Mode.Application, version=6)
     response = client.compile(teal)
@@ -133,6 +141,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
     
         return Seq([
+            checkForDuplicate(),
+
             # All governance must be done with the most recent guardian set...
             set.store(governanceSet()),
             idx.store(Extract(Txn.application_args[1], Int(1), Int(4))),
@@ -216,6 +226,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         a = ScratchVar()
     
         return Seq([
+            checkForDuplicate(),
+
             Assert(And(
                 # Lets see if the vaa we are about to process was actually verified by the core
                 Gtxn[Txn.group_index() - Int(3)].type_enum() == TxnType.ApplicationCall,
@@ -358,6 +370,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         asset = ScratchVar()
     
         return Seq([
+            checkForDuplicate(),
+
             Assert(And(
                 # Lets see if the vaa we are about to process was actually verified by the core
                 Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
@@ -548,6 +562,39 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             Approve()
         ])
+
+    @Subroutine(TealType.none)
+    def checkForDuplicate():
+        off = ScratchVar()
+        emitter = ScratchVar()
+        sequence = ScratchVar()
+        b = ScratchVar()
+        byte_offset = ScratchVar()
+
+        return Seq(
+            # VM only is version 1
+            Assert(Btoi(Extract(Txn.application_args[1], Int(0), Int(1))) == Int(1)),
+
+            off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(14)), # The offset of the emitter
+
+            # emitter is chain/contract-address
+            emitter.store(Extract(Txn.application_args[1], off.load(), Int(34))),
+            sequence.store(Btoi(Extract(Txn.application_args[1], off.load() + Int(34), Int(8)))),
+
+            # They passed us the correct account?  In this case, byte_offset points at the whole block
+            byte_offset.store(sequence.load() / Int(max_bits)),
+            Assert(Txn.accounts[1] == get_sig_address(byte_offset.load(), emitter.load())),
+
+            # Now, lets go grab the raw byte
+            byte_offset.store((sequence.load() / Int(8)) % Int(max_bytes)),
+            b.store(blob.get_byte(Int(1), byte_offset.load())),
+
+            # I would hope we've never seen this packet before...   throw an exception if we have
+            Assert(GetBit(b.load(), sequence.load() % Int(8)) == Int(0)),
+
+            # Lets mark this bit so that we never see it again
+            blob.set_byte(Int(1), byte_offset.load(), SetBit(b.load(), sequence.load() % Int(8), Int(1)))
+        )
 
     def nop():
         return Seq([Approve()])

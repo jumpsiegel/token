@@ -279,8 +279,6 @@ def getCoreContracts(   client: AlgodClient,
             guardian = ScratchVar()
 
             return Seq([
-                checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
-
                 # We have a guardian set?  We have OUR guardian set?
                 Assert(Txn.accounts[2] == get_sig_address(Btoi(Extract(Txn.application_args[1], Int(1), Int(4))), Bytes("guardian"))),
 
@@ -367,6 +365,8 @@ def getCoreContracts(   client: AlgodClient,
 
         def governance():
             return Seq([
+                checkForDuplicate(), # Verify this is not a duplicate message and then make sure we never see it again
+
                 Assert(And(
                     Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.ApplicationCall,
                     Gtxn[Txn.group_index() - Int(1)].application_id() == Txn.application_id(),
