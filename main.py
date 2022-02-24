@@ -538,7 +538,7 @@ class PortalCore:
                 off += 32
 
         if vaa[off:(off + 32)].hex() == "00000000000000000000000000000000000000000000000000000000436f7265":
-            ret["Meta"] = "NewGuardianSetIndex"
+            ret["Meta"] = "CoreGovernance"
             ret["module"] = vaa[off:(off + 32)].hex()
             off += 32
             ret["action"] = int.from_bytes(vaa[off:(off + 1)], "big")
@@ -657,7 +657,7 @@ class PortalCore:
         p = self.parseVAA(vaa)
 
         # First we need to opt into the sequence number 
-        if p["Meta"] == "NewGuardianSetIndex":
+        if p["Meta"] == "CoreGovernance":
             appid = self.coreid
         else:
             appid = self.tokenid
@@ -669,7 +669,7 @@ class PortalCore:
         accts = [seq_addr, guardian_addr]
 
         # If this happens to be setting up a new guardian set, we probably need it as well...
-        if p["Meta"] == "NewGuardianSetIndex":
+        if p["Meta"] == "CoreGovernance" and p["action"] == 2:
             newguardian_addr = self.optin(client, sender, self.coreid, p["NewGuardianSetIndex"], b"guardian".hex())
             accts.append(newguardian_addr)
 
@@ -754,7 +754,7 @@ class PortalCore:
             sp=sp
         ))
 
-        if p["Meta"] == "NewGuardianSetIndex":
+        if p["Meta"] == "CoreGovernance":
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
                 index=self.coreid,
