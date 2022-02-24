@@ -304,15 +304,15 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         TxnField.type_enum: TxnType.AssetConfig,
                         TxnField.config_asset_name: trim_bytes(Name.load()),        # TODO: ??
                         TxnField.config_asset_unit_name: trim_bytes(Symbol.load()), # TODO: ??
-                        # Do we want to burn/mint instead of just
-                        # having a reserve?  Sure is easier to just
-                        # have a reserve...
                         TxnField.config_asset_total: Int(int(1e17)),
                         TxnField.config_asset_decimals: Decimals.load(),
                         TxnField.config_asset_manager: me,
-                        TxnField.config_asset_freeze: me,
-                        TxnField.config_asset_clawback: me,
                         TxnField.config_asset_reserve: me,
+
+                        # We cannot freeze or clawback assets... per the spirit of 
+                        TxnField.config_asset_freeze: Global.zero_address(),
+                        TxnField.config_asset_clawback: Global.zero_address(),
+
                         TxnField.fee: Int(0),
                     }
                 ),
@@ -354,7 +354,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Approve()
         ])
 
-    # TODO: receiving algorand native coins...
     def receiveTransfer():
         me = Global.current_application_address()
         off = ScratchVar()
