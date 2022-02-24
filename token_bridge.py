@@ -499,35 +499,39 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         return Seq([
             # Lets see if we've seen this asset before
             asset.store(blob.read(Int(2), Int(0), Int(8))),
-            Assert(Txn.application_args[1] == asset.load()),
+            Cond([Txn.application_args[1] == asset.load(),
+                  Seq([
+                      p.store(blob.read(Int(2), Int(8), Int(108))) 
+                      ])],
+                 [Int(1) == Int(1), Seq([
+                     zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
 
-            zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
+                     aid.store(Btoi(Txn.application_args[1])),
 
-            aid.store(Btoi(Txn.application_args[1])),
+                     d.store(extract_decimal(aid.load())),
+                     uname.store(extract_unit_name(aid.load())),
+                     name.store(extract_name(aid.load())),
 
-            d.store(extract_decimal(aid.load())),
-            uname.store(extract_unit_name(aid.load())),
-            name.store(extract_name(aid.load())),
-
-            p.store(
-                Concat(
-                    #PayloadID uint8 = 2
-                    Bytes("base16", "02"),
-                    #TokenAddress [32]uint8
-                    Extract(zb.load(),Int(0), Int(24)),
-                    Txn.application_args[1],
-                    #TokenChain uint16
-                    Bytes("base16", "0008"),
-                    #Decimals uint8
-                    d.load(),
-                    #Symbol [32]uint8
-                    uname.load(),
-                    Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                    #Name [32]uint8
-                    name.load(),
-                    Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                )
-            ),
+                     p.store(
+                         Concat(
+                             #PayloadID uint8 = 2
+                             Bytes("base16", "02"),
+                             #TokenAddress [32]uint8
+                             Extract(zb.load(),Int(0), Int(24)),
+                             Txn.application_args[1],
+                             #TokenChain uint16
+                             Bytes("base16", "0008"),
+                             #Decimals uint8
+                             d.load(),
+                             #Symbol [32]uint8
+                             uname.load(),
+                             Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                             #Name [32]uint8
+                             name.load(),
+                             Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                         )
+                     )])]
+                 ),
 
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
