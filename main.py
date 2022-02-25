@@ -532,9 +532,6 @@ class PortalCore:
         if creator == None:
             raise Exception("unheld asset")
 
-        aa = decode_address(get_application_address(self.tokenid)).hex()
-        emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
-
         txns = []
         sp = client.suggested_params()
 
