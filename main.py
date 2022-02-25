@@ -159,7 +159,7 @@ class PortalCore:
     
     def getTemporaryAccount(self, client: AlgodClient) -> Account:
         if len(self.accountList) == 0:
-            sks = [account.generate_account()[0] for i in range(2)]
+            sks = [account.generate_account()[0] for i in range(3)]
             self.accountList = [Account(sk) for sk in sks]
     
             genesisAccounts = self.getGenesisAccounts()
@@ -395,7 +395,7 @@ class PortalCore:
 
         if sig_addr not in self.cache and not self.account_exists(client, app_id, sig_addr):
             if doCreate:
-                print("Creating " + sig_addr)
+#                pprint.pprint(("Creating", app_id, idx, emitter, sig_addr))
 
                 # Create it
                 sp = client.suggested_params()
@@ -519,7 +519,8 @@ class PortalCore:
         return aid
 
     def testAttest(self, client, sender, asset_id):
-        aa = decode_address(get_application_address(self.tokenid)).hex()
+        taddr = get_application_address(self.tokenid)
+        aa = decode_address(taddr).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
 
         creator = None
@@ -531,6 +532,14 @@ class PortalCore:
 
         if creator == None:
             raise Exception("unheld asset")
+
+        c = client.account_info(x["creator"])
+        wormhole = c.get("auth-addr") == taddr
+
+        if wormhole:
+            print("Wormhole wrapped asset")
+        else:
+            creator = self.optin(client, sender, self.tokenid, asset_id, b"native".hex())
 
         txns = []
         sp = client.suggested_params()
@@ -1046,32 +1055,36 @@ class PortalCore:
 
         aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
         print("generate an attest of the asset we just received")
-        self.testAttest(client, player, aid)
+        #self.testAttest(client, player, aid)
 
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
         print("player2 address " + player2.getAddress())
+        player3 = self.getTemporaryAccount(client)
+        print("player3 address " + player2.getAddress())
 
         self.testid = self.createTestApp(client, player2)
         print("testid " + str(self.testid) + " address " + get_application_address(self.testid))
 
         print("Sending a message payload to the core contract")
-        self.publishMessage(client, player2, b"you also suck", self.testid)
+        self.publishMessage(client, player, b"you also suck", self.testid)
         self.publishMessage(client, player2, b"second suck", self.testid)
+        self.publishMessage(client, player3, b"last message", self.testid)
         
         print("Lets create a brand new non-wormhole asset and try to attest and send it out")
         self.testasset = self.createTestAsset(client, player2)
         
         print("test asset id: " + str(self.testasset))
 
-        print("player2 account: " + player2.getAddress())
-        pprint.pprint(client.account_info(player2.getAddress()))
 
         print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
         self.testAttest(client, player2, self.testasset)
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))
+
+#        print("player2 account: " + player2.getAddress())
+#        pprint.pprint(client.account_info(player2.getAddress()))
 
 #        print("foundation account: " + foundation.getAddress())
 #        pprint.pprint(client.account_info(foundation.getAddress()))
