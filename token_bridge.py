@@ -477,8 +477,18 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         return Seq([Approve()])
 
     @Subroutine(TealType.bytes)
+    def auth_addr(id) -> Expr:
+        maybe = AccountParam.authAddr(id)
+        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
+
+    @Subroutine(TealType.bytes)
     def extract_name(id) -> Expr:
         maybe = AssetParam.name(id)
+        return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
+
+    @Subroutine(TealType.bytes)
+    def extract_creator(id) -> Expr:
+        maybe = AssetParam.creator(id)
         return Seq(maybe, If(maybe.hasValue(), maybe.value(), Bytes("")))
 
     @Subroutine(TealType.bytes)
@@ -500,44 +510,64 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         name = ScratchVar()
         aid = ScratchVar()
 
+        Address = ScratchVar()
+        FromChain = ScratchVar()
+
         return Seq([
-            # Lets see if we've seen this asset before
-            asset.store(blob.read(Int(2), Int(0), Int(8))),
-            Cond(
-                [
-                    # Is this a wrapped from another chain?  Lets just send the attest we got back then...
-                    Txn.application_args[1] == asset.load(), p.store(blob.read(Int(2), Int(8), Int(108)))
-                ],
-                [Int(1) == Int(1), Seq([
-                    zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
+            aid.store(Btoi(Txn.application_args[1])),
+            # Is the authorizing signature of the creator of the asset the address of the token_id?
+            If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
+               Seq([
+                   Log(Bytes("Wormhole wrapped")),
+                   # Wormhole wrapped asset
+                   asset.store(blob.read(Int(2), Int(0), Int(8))),
+                   # This the correct asset?
+                   Assert(Txn.application_args[1] == asset.load()),
+
+                   # Pull the address and chain out of the received vaa
+                   Address.store(blob.read(Int(2), Int(60), Int(92))),
+                   FromChain.store(Btoi(blob.read(Int(2), Int(92), Int(94)))),
+
+                   # This the correct page given the chain and the address
+                   Assert(Txn.accounts[2] == get_sig_address(FromChain.load(), Address.load())),
+
+                   # Lets just hand back the previously generated vaa payload
+                   p.store(blob.read(Int(2), Int(8), Int(108)))
+                   ]),
+               Seq([
+                   Log(Bytes("Non Wormhole wrapped")),
+                   Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
+
+                   zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
 
                     aid.store(Btoi(Txn.application_args[1])),
 
                     d.store(extract_decimal(aid.load())),
-                    uname.store(extract_unit_name(aid.load())),
-                    name.store(extract_name(aid.load())),
+                   uname.store(extract_unit_name(aid.load())),
+                   name.store(extract_name(aid.load())),
 
                     p.store(
-                         Concat(
-                             #PayloadID uint8 = 2
+                        Concat(
+                            #PayloadID uint8 = 2
                              Bytes("base16", "02"),
-                             #TokenAddress [32]uint8
+                            #TokenAddress [32]uint8
                              Extract(zb.load(),Int(0), Int(24)),
-                             Txn.application_args[1],
-                             #TokenChain uint16
+                            Txn.application_args[1],
+                            #TokenChain uint16
                              Bytes("base16", "0008"),
-                             #Decimals uint8
+                            #Decimals uint8
                              d.load(),
-                             #Symbol [32]uint8
+                            #Symbol [32]uint8
                              uname.load(),
-                             Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                             #Name [32]uint8
+                            Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                            #Name [32]uint8
                              name.load(),
-                             Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                         )
-                     )])
-                 ]
+                            Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                        )
+                    ),
+               ])
             ),
+
 
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(

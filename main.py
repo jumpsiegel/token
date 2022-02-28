@@ -544,6 +544,8 @@ class PortalCore:
         txns = []
         sp = client.suggested_params()
 
+#        pprint.pprint ((c, emitter_addr, creator))
+
         a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=self.tokenid,
@@ -551,7 +553,7 @@ class PortalCore:
             app_args=[b"attestToken", asset_id],
             foreign_apps = [self.coreid],
             foreign_assets = [asset_id],
-            accounts=[emitter_addr, creator],
+            accounts=[emitter_addr, creator, c["address"]],
             sp=sp
         )
 
@@ -568,7 +570,9 @@ class PortalCore:
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(resp.__dict__)
-        pprint.pprint(self.parseSeqFromLog(resp))
+#        print(encode_address(resp.__dict__["logs"][0]))
+#        print(encode_address(resp.__dict__["logs"][1]))
+#        pprint.pprint(self.parseSeqFromLog(resp))
 
     def asset_optin(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
@@ -1055,13 +1059,13 @@ class PortalCore:
 
         aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
         print("generate an attest of the asset we just received")
-        #self.testAttest(client, player, aid)
+        self.testAttest(client, player, aid)
 
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
         print("player2 address " + player2.getAddress())
         player3 = self.getTemporaryAccount(client)
-        print("player3 address " + player2.getAddress())
+        print("player3 address " + player3.getAddress())
 
         self.testid = self.createTestApp(client, player2)
         print("testid " + str(self.testid) + " address " + get_application_address(self.testid))
