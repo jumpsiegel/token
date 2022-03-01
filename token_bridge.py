@@ -514,8 +514,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
             )),
 
-#            Log(Gtxn[Txn.group_index() - Int(1)].receiver()),
-#            Log(Txn.accounts[2]),
             aid.store(Btoi(Txn.application_args[1])),
             amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
             d.store(Btoi(extract_decimal(aid.load()))),
@@ -533,7 +531,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 [d.load() >  Int(16), Assert(d.load() < Int(16))],
             ),
 
-            # 
+            # If it is nothing but dust lets just abort the whole transaction and save 
             Assert(amount.load() > Int(0)),
 
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
