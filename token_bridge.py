@@ -55,7 +55,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     @Subroutine(TealType.bytes)
     def governanceSet() -> Expr:
         maybe = App.globalGetEx(App.globalGet(Bytes("coreid")), Bytes("currentGuardianSetIndex"))
-    
+        
         return Seq(maybe, Assert(maybe.hasValue()), maybe.value())
     
     
@@ -67,12 +67,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             Concat(
                 buff.load(),
                 If(
-                    val >= Int(128),
-                    encode_uvarint(
-                        val >> Int(7),
-                        Extract(Itob((val & Int(255)) | Int(128)), Int(7), Int(1)),
-                    ),
-                    Extract(Itob(val & Int(255)), Int(7), Int(1)),
+                        val >= Int(128),
+                        encode_uvarint(
+                            val >> Int(7),
+                            Extract(Itob((val & Int(255)) | Int(128)), Int(7), Int(1)),
+                        ),
+                        Extract(Itob(val & Int(255)), Int(7), Int(1)),
                 ),
             ),
         )
@@ -96,7 +96,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                         r.store(Extract(r.load(), Int(0), off.load())),
                         off.store(len.load())
                 ])),
-                off.store(off.load() + Int(1))
+                    off.store(off.load() + Int(1))
             ])),
             r.load()
         ])
@@ -174,7 +174,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 # Better be the right emitters
                 Extract(Txn.application_args[1], off.load(), Int(2)) == Bytes("base16", "0001"),
                 Extract(Txn.application_args[1], off.load() + Int(2), Int(32)) == Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000004"),
-    
+                
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
             )),
 
@@ -215,7 +215,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     def receiveAttest():
         me = Global.current_application_address()
         off = ScratchVar()
-    
+        
         Address = ScratchVar()
         Chain = ScratchVar()
         FromChain = ScratchVar()
@@ -227,7 +227,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         buf = ScratchVar()
         c = ScratchVar()
         a = ScratchVar()
-    
+        
         return Seq([
             checkForDuplicate(),
 
@@ -244,7 +244,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(3)].accounts[0] == Txn.accounts[0],
                 Gtxn[Txn.group_index() - Int(3)].accounts[1] == Txn.accounts[1],
                 Gtxn[Txn.group_index() - Int(3)].accounts[2] == Txn.accounts[2],
-    
+                
                 # Did the user pay the lsig to attest a new product?
                 Gtxn[Txn.group_index() - Int(2)].type_enum() == TxnType.Payment,
                 Gtxn[Txn.group_index() - Int(2)].amount() >= Int(100000),
@@ -258,7 +258,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(1)].application_args[0] == Bytes("nop"),
                 Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
                 Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
-    
+                
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
             )),
 
@@ -268,12 +268,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Make sure that the emitter on the sending chain is correct for the token bridge
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
                    == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
-    
+            
             off.store(off.load()+Int(43)),
 
             Assert(Int(2) ==      Btoi(Extract(Txn.application_args[1], off.load(),           Int(1)))),
             Address.store(             Extract(Txn.application_args[1], off.load() + Int(1),  Int(32))),
-    
+            
             FromChain.store(      Btoi(Extract(Txn.application_args[1], off.load() + Int(33), Int(2)))),
             Decimals.store(       Btoi(Extract(Txn.application_args[1], off.load() + Int(35), Int(1)))),
             Symbol.store(              Extract(Txn.application_args[1], off.load() + Int(36), Int(32))),
@@ -306,29 +306,29 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             # New asset
             If(asset.load() == Itob(Int(0))).Then(Seq([
-                InnerTxnBuilder.Begin(),
-                InnerTxnBuilder.SetFields(
-                    {
-                        TxnField.sender: Txn.accounts[3],
-                        TxnField.type_enum: TxnType.AssetConfig,
-                        TxnField.config_asset_name: Name.load(),
-                        TxnField.config_asset_unit_name: Symbol.load(),
-                        TxnField.config_asset_total: Int(int(1e17)),
-                        TxnField.config_asset_decimals: Decimals.load(),
-                        TxnField.config_asset_manager: me,
-                        TxnField.config_asset_reserve: me,
+                    InnerTxnBuilder.Begin(),
+                    InnerTxnBuilder.SetFields(
+                        {
+                            TxnField.sender: Txn.accounts[3],
+                            TxnField.type_enum: TxnType.AssetConfig,
+                            TxnField.config_asset_name: Name.load(),
+                            TxnField.config_asset_unit_name: Symbol.load(),
+                            TxnField.config_asset_total: Int(int(1e17)),
+                            TxnField.config_asset_decimals: Decimals.load(),
+                            TxnField.config_asset_manager: me,
+                            TxnField.config_asset_reserve: me,
 
                         # We cannot freeze or clawback assets... per the spirit of 
                         TxnField.config_asset_freeze: Global.zero_address(),
-                        TxnField.config_asset_clawback: Global.zero_address(),
+                            TxnField.config_asset_clawback: Global.zero_address(),
 
                         TxnField.fee: Int(0),
-                    }
-                ),
-                InnerTxnBuilder.Submit(),
+                        }
+                    ),
+                    InnerTxnBuilder.Submit(),
 
                 asset.store(Itob(InnerTxn.created_asset_id())),
-                Pop(blob.write(Int(3), Int(0), asset.load())),
+                    Pop(blob.write(Int(3), Int(0), asset.load())),
             ])).Else(Seq([
                 Assert(And(
                     # Same address?
@@ -353,7 +353,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 ),
                 InnerTxnBuilder.Submit(),
             ])),
-    
+            
             # We save away the entire digest that created this asset in case we ever need to reproduce it while sending this
             # coin to another chain
 
@@ -366,7 +366,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     def receiveTransfer():
         me = Global.current_application_address()
         off = ScratchVar()
-    
+        
         Chain = ScratchVar()
 
         Amount = ScratchVar()
@@ -376,7 +376,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         DestChain = ScratchVar()
         Fee = ScratchVar()
         asset = ScratchVar()
-    
+        
         return Seq([
             checkForDuplicate(),
 
@@ -393,7 +393,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(1)].accounts[0] == Txn.accounts[0],
                 Gtxn[Txn.group_index() - Int(1)].accounts[1] == Txn.accounts[1],
                 Gtxn[Txn.group_index() - Int(1)].accounts[2] == Txn.accounts[2],
-    
+                
                 (Global.group_size() - Int(1)) == Txn.group_index()    # This should be the last entry...
             )),
 
@@ -404,7 +404,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # We coming from the correct emitter on the sending chain for the token bridge
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
                    == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
-    
+            
             off.store(off.load()+Int(43)),
 
             # This is a transfer message... right?
@@ -437,14 +437,14 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Actually send the coins...
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
-                 {
-                     TxnField.sender: Txn.accounts[3],
-                     TxnField.type_enum: TxnType.AssetTransfer,
-                     TxnField.xfer_asset: asset.load(),
-                     TxnField.asset_amount: Amount.load(),
-                     TxnField.asset_receiver: Destination.load(),
-                     TxnField.fee: Int(0),
-                 }
+                {
+                    TxnField.sender: Txn.accounts[3],
+                    TxnField.type_enum: TxnType.AssetTransfer,
+                    TxnField.xfer_asset: asset.load(),
+                    TxnField.asset_amount: Amount.load(),
+                    TxnField.asset_receiver: Destination.load(),
+                    TxnField.fee: Int(0),
+                }
             ),
             InnerTxnBuilder.Submit(),
 
@@ -469,12 +469,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
     METHOD = Txn.application_args[0]
 
     on_delete = Seq([Reject()])
-
-    def transfer():
-        return Seq([Approve()])
-
-    def transferWithPayload():
-        return Seq([Approve()])
 
     @Subroutine(TealType.bytes)
     def auth_addr(id) -> Expr:
@@ -501,6 +495,51 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         maybe = AssetParam.decimals(id)
         return Seq(maybe, If(maybe.hasValue(), Extract(Itob(maybe.value()), Int(7), Int(1)), Bytes("base16", "00")))
 
+    def transfer():
+        return Seq([
+#            InnerTxnBuilder.Begin(),
+#            InnerTxnBuilder.SetFields(
+#                {
+#                    TxnField.sender: Txn.sender(),
+#                    TxnField.type_enum: TxnType.AssetTransfer,
+#                    TxnField.xfer_asset: Btoi(Txn.application_args[1]),
+#                    TxnField.asset_amount: Btoi(Txn.application_args[2]),
+#                    TxnField.asset_receiver: Txn.accounts[2],
+#                    TxnField.fee: Int(0),
+#                }
+#            ),
+#            InnerTxnBuilder.Submit(),
+
+            Approve()
+        ])
+
+    def do_optin():
+        return Seq([
+            Assert(And(
+                Txn.rekey_to() == Global.zero_address(),
+                Txn.accounts[1] == get_sig_address(Btoi(Txn.application_args[1]), Bytes("native"))
+            )),
+
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.sender: Txn.accounts[1],
+                    TxnField.type_enum: TxnType.AssetTransfer,
+                    TxnField.xfer_asset: Btoi(Txn.application_args[1]),
+                    TxnField.asset_amount: Int(0),
+                    TxnField.asset_receiver: Txn.accounts[1],
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
+
+            Approve()
+        ])
+
+    def transferWithPayload():
+        return Seq([Approve()])
+
+    # This is for attesting everything except ALGO itself...
     def attestToken():
         asset = ScratchVar()
         p = ScratchVar()
@@ -515,7 +554,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
         return Seq([
             aid.store(Btoi(Txn.application_args[1])),
-            # Is the authorizing signature of the creator of the asset the address of the token_id?
+            # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
             If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
                Seq([
                    Log(Bytes("Wormhole wrapped")),
@@ -533,40 +572,40 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                    # Lets just hand back the previously generated vaa payload
                    p.store(blob.read(Int(2), Int(8), Int(108)))
-                   ]),
+               ]),
                Seq([
                    Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
 
                    zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
+                   
+                   aid.store(Btoi(Txn.application_args[1])),
 
-                    aid.store(Btoi(Txn.application_args[1])),
-
-                    d.store(extract_decimal(aid.load())),
+                   d.store(extract_decimal(aid.load())),
                    uname.store(extract_unit_name(aid.load())),
                    name.store(extract_name(aid.load())),
 
-                    p.store(
-                        Concat(
-                            #PayloadID uint8 = 2
-                             Bytes("base16", "02"),
-                            #TokenAddress [32]uint8
-                             Extract(zb.load(),Int(0), Int(24)),
-                            Txn.application_args[1],
-                            #TokenChain uint16
-                             Bytes("base16", "0008"),
-                            #Decimals uint8
-                             d.load(),
-                            #Symbol [32]uint8
-                             uname.load(),
-                            Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                            #Name [32]uint8
-                             name.load(),
-                            Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
-                        )
-                    ),
+                   p.store(
+                       Concat(
+                           #PayloadID uint8 = 2
+                           Bytes("base16", "02"),
+                           #TokenAddress [32]uint8
+                           Extract(zb.load(),Int(0), Int(24)),
+                           Txn.application_args[1],
+                           #TokenChain uint16
+                           Bytes("base16", "0008"),
+                           #Decimals uint8
+                           d.load(),
+                           #Symbol [32]uint8
+                           uname.load(),
+                           Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                           #Name [32]uint8
+                           name.load(),
+                           Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                       )
+                   ),
                ])
-            ),
+               ),
 
 
             InnerTxnBuilder.Begin(),
@@ -627,6 +666,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         [METHOD == Bytes("attestToken"), attestToken()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
         [METHOD == Bytes("transfer"), transfer()],
+        [METHOD == Bytes("optin"), do_optin()],
         [METHOD == Bytes("transferWithPayload"), transferWithPayload()],
         [METHOD == Bytes("governance"), governance()],
     )

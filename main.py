@@ -536,9 +536,7 @@ class PortalCore:
         c = client.account_info(x["creator"])
         wormhole = c.get("auth-addr") == taddr
 
-        if wormhole:
-            print("Wormhole wrapped asset")
-        else:
+        if not wormhole:
             creator = self.optin(client, sender, self.tokenid, asset_id, b"native".hex())
 
         txns = []
@@ -569,24 +567,122 @@ class PortalCore:
 
         client.send_transactions(grp)
         resp = self.waitForTransaction(client, grp[-1].get_txid())
+#        pprint.pprint(resp.__dict__)
+#        print(encode_address(resp.__dict__["logs"][0]))
+#        print(encode_address(resp.__dict__["logs"][1]))
+        pprint.pprint(self.parseSeqFromLog(resp))
+
+    def transferAsset(self, client, sender, asset_id, quantity, receiver):
+        taddr = get_application_address(self.tokenid)
+        aa = decode_address(taddr).hex()
+        emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
+
+        creator = None
+        assets = client.account_info(sender.getAddress())["assets"]
+        for x in assets:
+            if x["asset-id"] == asset_id:
+                creator = x["creator"]
+                break
+
+        if creator == None:
+            raise Exception("unheld asset")
+
+        c = client.account_info(x["creator"])
+        wormhole = c.get("auth-addr") == taddr
+
+        txns = []
+
+        if not wormhole:
+            creator = self.optin(client, sender, self.tokenid, asset_id, b"native".hex())
+            print("non wormhole account " + creator)
+
+        sp = client.suggested_params()
+
+        if not self.asset_optin_check(client, sender, asset_id, creator):
+            print("Looks like we need to optin")
+
+            txns.append(
+                transaction.PaymentTxn(
+                    sender=sender.getAddress(),
+                    receiver=creator,
+                    amt=100000,
+                    sp=sp
+                )
+            )
+
+            # The tokenid app needs to do the optin since it has signature authority
+            a = transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"optin", asset_id],
+                foreign_assets = [asset_id],
+                accounts=[creator],
+                sp=sp
+            )
+
+            a.fee = a.fee * 2
+            txns.append(a)
+
+        txns.append(
+            transaction.AssetTransferTxn(
+                sender = sender.getAddress(), 
+                sp = sp, 
+                receiver = creator,
+                amt = quantity,
+                index = asset_id
+            )
+        )
+
+        a = transaction.ApplicationCallTxn(
+            sender=sender.getAddress(),
+            index=self.tokenid,
+            on_complete=transaction.OnComplete.NoOpOC,
+            app_args=[b"transfer", asset_id, quantity, decode_address(receiver)],
+            foreign_apps = [self.coreid],
+            foreign_assets = [asset_id],
+            accounts=[emitter_addr, creator, c["address"]],
+            sp=sp
+        )
+
+        a.fee = a.fee * 2
+
+        txns.append(a)
+        transaction.assign_group_id(txns)
+
+        grp = []
+        pk = sender.getPrivateKey()
+        for t in txns:
+            grp.append(t.sign(pk))
+
+        client.send_transactions(grp)
+        resp = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(resp.__dict__)
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
 #        pprint.pprint(self.parseSeqFromLog(resp))
 
-    def asset_optin(self, client, sender, asset, receiver):
+    def asset_optin_check(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
             self.asset_cache[receiver] = {}
 
         if asset in self.asset_cache[receiver]:
-            return
+            return True
 
         ai = client.account_info(receiver)
         if "assets" in ai:
             for x in ai["assets"]:
                 if x["asset-id"] == asset:
                     self.asset_cache[receiver][asset] = True
-                    return
+                    return True
+
+        return False
+
+    def asset_optin(self, client, sender, asset, receiver):
+        if self.asset_optin_check(client, sender, asset, receiver):
+            return
+
+        pprint.pprint(["asset_optin", asset, receiver])
 
         sp = client.suggested_params()
         optin_txn = transaction.AssetTransferTxn(
@@ -601,6 +697,7 @@ class PortalCore:
         signed_optin = optin_txn.sign(sender.getPrivateKey())
         client.send_transactions([signed_optin])
         resp = self.waitForTransaction(client, signed_optin.get_txid())
+        pprint.pprint(resp.__dict__)
         self.asset_cache[receiver][asset] = True
 
     def parseVAA(self, vaa):
@@ -1080,9 +1177,17 @@ class PortalCore:
         
         print("test asset id: " + str(self.testasset))
 
-
         print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
         self.testAttest(client, player2, self.testasset)
+
+        pprint.pprint(self.getBalances(client, player2.getAddress()))
+        pprint.pprint(self.getBalances(client, player3.getAddress()))
+
+        print("Lets transfer that asset to one of our other accounts")
+        self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+
+        pprint.pprint(self.getBalances(client, player2.getAddress()))
+        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))
