@@ -265,7 +265,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
-            # We coming from the correct emitter?
+            # Make sure that the emitter on the sending chain is correct for the token bridge
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
                    == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
@@ -401,7 +401,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
-            # We coming from the correct emitter?
+            # We coming from the correct emitter on the sending chain for the token bridge
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
                    == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
     
@@ -524,7 +524,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                    # This the correct asset?
                    Assert(Txn.application_args[1] == asset.load()),
 
-                   # Pull the address and chain out of the received vaa
+                   # Pull the address and chain out of the original vaa
                    Address.store(blob.read(Int(2), Int(60), Int(92))),
                    FromChain.store(Btoi(blob.read(Int(2), Int(92), Int(94)))),
 
