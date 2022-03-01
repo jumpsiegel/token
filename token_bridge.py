@@ -505,15 +505,17 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         FromChain = ScratchVar()
 
         return Seq([
+            aid.store(Btoi(Txn.application_args[1])),
             Assert(And(
                 Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
                 Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(1)].receiver() == Txn.accounts[2],
+                Gtxn[Txn.group_index() - Int(1)].xfer_asset() == aid.load(),
+#                Gtxn[Txn.group_index() - Int(1)].receiver() == Txn.accounts[2],
                 Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
             )),
             aid.store(Btoi(Txn.application_args[1])),
             amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
-            d.store(extract_decimal(aid.load())),
+            d.store(Btoi(extract_decimal(aid.load()))),
 
             # Throw away the dust..
             Cond(
@@ -529,7 +531,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             ),
 
             # 
-            Assert(d.load() > Int(0)),
+            Assert(amount.load() > Int(0)),
 
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
             If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
@@ -726,7 +728,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         [METHOD == Bytes("receiveAttest"), receiveAttest()],
         [METHOD == Bytes("attestToken"), attestToken()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
-        [METHOD == Bytes("transfer"), sendTransfer()],
+        [METHOD == Bytes("sendTransfer"), sendTransfer()],
         [METHOD == Bytes("optin"), do_optin()],
         [METHOD == Bytes("transferWithPayload"), transferWithPayload()],
         [METHOD == Bytes("governance"), governance()],
