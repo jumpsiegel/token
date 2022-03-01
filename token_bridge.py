@@ -495,16 +495,73 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         maybe = AssetParam.decimals(id)
         return Seq(maybe, If(maybe.hasValue(), Extract(Itob(maybe.value()), Int(7), Int(1)), Bytes("base16", "00")))
 
-    def transfer():
+
+    def sendTransfer():
+        aid = ScratchVar()
+        amount = ScratchVar()
+        d = ScratchVar()
+        asset = ScratchVar()
+        Address = ScratchVar()
+        FromChain = ScratchVar()
+
         return Seq([
+            Assert(And(
+                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
+                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                Gtxn[Txn.group_index() - Int(1)].receiver() == Txn.accounts[2],
+                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+            )),
+            aid.store(Btoi(Txn.application_args[1])),
+            amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
+            d.store(extract_decimal(aid.load())),
+
+            # Throw away the dust..
+            Cond(
+                [d.load() == Int(9),  amount.store(amount.load() / Int(10))],
+                [d.load() == Int(10), amount.store(amount.load() / Int(100))],
+                [d.load() == Int(11), amount.store(amount.load() / Int(1000))],
+                [d.load() == Int(12), amount.store(amount.load() / Int(10000))],
+                [d.load() == Int(13), amount.store(amount.load() / Int(100000))],
+                [d.load() == Int(14), amount.store(amount.load() / Int(1000000))],
+                [d.load() == Int(15), amount.store(amount.load() / Int(10000000))],
+                [d.load() == Int(16), amount.store(amount.load() / Int(100000000))],
+                [d.load() >  Int(16), Assert(d.load() < Int(16))],
+            ),
+
+            # 
+            Assert(d.load() > Int(0)),
+
+            # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
+            If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
+               Seq([
+                   Log(Bytes("Wormhole wrapped")),
+
+                   asset.store(blob.read(Int(2), Int(0), Int(8))),
+                   # This the correct asset?
+                   Assert(Txn.application_args[1] == asset.load()),
+
+                   # Pull the address and chain out of the original vaa
+                   Address.store(blob.read(Int(2), Int(60), Int(92))),
+                   FromChain.store(Btoi(blob.read(Int(2), Int(92), Int(94)))),
+
+                   # This the correct page given the chain and the address
+                   Assert(Txn.accounts[2] == get_sig_address(FromChain.load(), Address.load())),
+               ]),
+               Seq([
+                   Log(Bytes("Non Wormhole wrapped")),
+                   Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
+               ])
+               ),
+
+
 #            InnerTxnBuilder.Begin(),
 #            InnerTxnBuilder.SetFields(
 #                {
-#                    TxnField.sender: Txn.sender(),
-#                    TxnField.type_enum: TxnType.AssetTransfer,
-#                    TxnField.xfer_asset: Btoi(Txn.application_args[1]),
-#                    TxnField.asset_amount: Btoi(Txn.application_args[2]),
-#                    TxnField.asset_receiver: Txn.accounts[2],
+#                    TxnField.type_enum: TxnType.ApplicationCall,
+#                    TxnField.application_id: App.globalGet(Bytes("coreid")),
+#                    TxnField.application_args: [Bytes("publishMessage"), p.load()],
+#                    TxnField.accounts: [Txn.accounts[1]],
+#                    TxnField.note: Bytes("publishMessage"),
 #                    TxnField.fee: Int(0),
 #                }
 #            ),
@@ -557,7 +614,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
             If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
                Seq([
-                   Log(Bytes("Wormhole wrapped")),
+                   #Log(Bytes("Wormhole wrapped")),
                    # Wormhole wrapped asset
                    asset.store(blob.read(Int(2), Int(0), Int(8))),
                    # This the correct asset?
@@ -570,11 +627,14 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                    # This the correct page given the chain and the address
                    Assert(Txn.accounts[2] == get_sig_address(FromChain.load(), Address.load())),
 
+                   # this is wormhole wrapped... it shouldn't be busting 8 
+                   Assert(Btoi(extract_decimal(aid.load())) <= Int(8)),
+
                    # Lets just hand back the previously generated vaa payload
                    p.store(blob.read(Int(2), Int(8), Int(108)))
                ]),
                Seq([
-                   Log(Bytes("Non Wormhole wrapped")),
+                   #Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
 
                    zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
@@ -582,6 +642,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                    aid.store(Btoi(Txn.application_args[1])),
 
                    d.store(extract_decimal(aid.load())),
+                   If(Btoi(d.load()) > Int(8), d.store(Bytes("base16", "08"))),
                    uname.store(extract_unit_name(aid.load())),
                    name.store(extract_name(aid.load())),
 
@@ -665,7 +726,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         [METHOD == Bytes("receiveAttest"), receiveAttest()],
         [METHOD == Bytes("attestToken"), attestToken()],
         [METHOD == Bytes("receiveTransfer"), receiveTransfer()],
-        [METHOD == Bytes("transfer"), transfer()],
+        [METHOD == Bytes("transfer"), sendTransfer()],
         [METHOD == Bytes("optin"), do_optin()],
         [METHOD == Bytes("transferWithPayload"), transferWithPayload()],
         [METHOD == Bytes("governance"), governance()],
