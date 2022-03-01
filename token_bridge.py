@@ -510,9 +510,12 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
                 Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
                 Gtxn[Txn.group_index() - Int(1)].xfer_asset() == aid.load(),
-#                Gtxn[Txn.group_index() - Int(1)].receiver() == Txn.accounts[2],
+                Gtxn[Txn.group_index() - Int(1)].asset_receiver() == Txn.accounts[2],
                 Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
             )),
+
+#            Log(Gtxn[Txn.group_index() - Int(1)].receiver()),
+#            Log(Txn.accounts[2]),
             aid.store(Btoi(Txn.application_args[1])),
             amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
             d.store(Btoi(extract_decimal(aid.load()))),
