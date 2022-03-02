@@ -634,10 +634,10 @@ class PortalCore:
         txns.append(a)
 
         resp = self.sendTxn(client, sender, txns, True)
-        pprint.pprint(resp.__dict__)
+#        pprint.pprint(resp.__dict__)
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
-#        pprint.pprint(self.parseSeqFromLog(resp))
+        pprint.pprint(self.parseSeqFromLog(resp))
 
     def sendTxn(self, client, sender, txns, doWait):
         transaction.assign_group_id(txns)
