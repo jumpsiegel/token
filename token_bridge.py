@@ -500,13 +500,26 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         aid = ScratchVar()
         amount = ScratchVar()
         d = ScratchVar()
+        p = ScratchVar()
         asset = ScratchVar()
         Address = ScratchVar()
         FromChain = ScratchVar()
+        zb = ScratchVar()
 
         return Seq([
+            zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
+
             aid.store(Btoi(Txn.application_args[1])),
             Assert(And(
+                # We dont know what we don't know.   Is it readonable
+                # to be so restrictive in a wormhole asset transfer?
+                # to not let you put more crap in the same txn block?
+                Txn.group_index() == Int(1),
+                Global.group_size() == Int(2),
+
+                Len(Txn.application_args[3]) <= Int(32),
+
+                # The previous txn is the asset transfer itself
                 Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
                 Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
                 Gtxn[Txn.group_index() - Int(1)].xfer_asset() == aid.load(),
@@ -545,30 +558,51 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                    # Pull the address and chain out of the original vaa
                    Address.store(blob.read(Int(2), Int(60), Int(92))),
-                   FromChain.store(Btoi(blob.read(Int(2), Int(92), Int(94)))),
+                   FromChain.store(blob.read(Int(2), Int(92), Int(94))),
 
                    # This the correct page given the chain and the address
-                   Assert(Txn.accounts[2] == get_sig_address(FromChain.load(), Address.load())),
+                   Assert(Txn.accounts[2] == get_sig_address(Btoi(FromChain.load()), Address.load())),
                ]),
                Seq([
                    Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
+                   FromChain.store(Bytes("base16", "0008")),
+                   Address.store(Global.current_application_address())
                ])
-               ),
+            ),
+
+            # Correct address len?
+            Assert(And(
+                Len(Address.load()) == Int(32),
+                Len(FromChain.load()) == Int(2),
+                Len(Txn.application_args[3]) <= Int(32)
+            )),
+
+            p.store(Concat(
+                Bytes("base16", "01"),
+                Extract(zb.load(), Int(0), Int(24)),
+                Itob(amount.load()),  # 8 bytes
+                Address.load(),
+                FromChain.load(),
+                Extract(zb.load(), Int(0), Int(32) - Len(Txn.application_args[3])),
+                Txn.application_args[3],
+                Extract(Txn.application_args[4], Int(6), Int(2)),
+                Extract(zb.load(), Int(0), Int(32))
+            )),
 
 
-#            InnerTxnBuilder.Begin(),
-#            InnerTxnBuilder.SetFields(
-#                {
-#                    TxnField.type_enum: TxnType.ApplicationCall,
-#                    TxnField.application_id: App.globalGet(Bytes("coreid")),
-#                    TxnField.application_args: [Bytes("publishMessage"), p.load()],
-#                    TxnField.accounts: [Txn.accounts[1]],
-#                    TxnField.note: Bytes("publishMessage"),
-#                    TxnField.fee: Int(0),
-#                }
-#            ),
-#            InnerTxnBuilder.Submit(),
+            InnerTxnBuilder.Begin(),
+            InnerTxnBuilder.SetFields(
+                {
+                    TxnField.type_enum: TxnType.ApplicationCall,
+                    TxnField.application_id: App.globalGet(Bytes("coreid")),
+                    TxnField.application_args: [Bytes("publishMessage"), p.load()],
+                    TxnField.accounts: [Txn.accounts[1]],
+                    TxnField.note: Bytes("publishMessage"),
+                    TxnField.fee: Int(0),
+                }
+            ),
+            InnerTxnBuilder.Submit(),
 
             Approve()
         ])

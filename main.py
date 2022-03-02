@@ -622,7 +622,7 @@ class PortalCore:
             sender=sender.getAddress(),
             index=self.tokenid,
             on_complete=transaction.OnComplete.NoOpOC,
-            app_args=[b"sendTransfer", asset_id, quantity, decode_address(receiver)],
+            app_args=[b"sendTransfer", asset_id, quantity, decode_address(receiver), 8, 0],
             foreign_apps = [self.coreid],
             foreign_assets = [asset_id],
             accounts=[emitter_addr, creator, c["address"]],
