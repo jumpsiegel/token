@@ -444,15 +444,9 @@ class PortalCore:
         a.fee = a.fee * 2
 
         txns.append(a)
-        transaction.assign_group_id(txns)
 
-        grp = []
-        pk = sender.getPrivateKey()
-        for t in txns:
-            grp.append(t.sign(pk))
+        resp = self.sendTxn(client, sender, txns, True)
 
-        client.send_transactions(grp)
-        resp = self.waitForTransaction(client, grp[-1].get_txid())
         pprint.pprint(self.parseSeqFromLog(resp))
 
     def createTestAsset(self, client, sender):
@@ -507,15 +501,9 @@ class PortalCore:
         a.fee = a.fee * 2
 
         txns.append(a)
-        transaction.assign_group_id(txns)
 
-        grp = []
-        pk = sender.getPrivateKey()
-        for t in txns:
-            grp.append(t.sign(pk))
+        resp = self.sendTxn(client, sender, txns, True)
 
-        client.send_transactions(grp)
-        resp = self.waitForTransaction(client, grp[-1].get_txid())
         return aid
 
     def testAttest(self, client, sender, asset_id):
@@ -558,15 +546,9 @@ class PortalCore:
         a.fee = a.fee * 2
 
         txns.append(a)
-        transaction.assign_group_id(txns)
 
-        grp = []
-        pk = sender.getPrivateKey()
-        for t in txns:
-            grp.append(t.sign(pk))
+        resp = self.sendTxn(client, sender, txns, True)
 
-        client.send_transactions(grp)
-        resp = self.waitForTransaction(client, grp[-1].get_txid())
 #        pprint.pprint(resp.__dict__)
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
@@ -623,6 +605,8 @@ class PortalCore:
 
             a.fee = a.fee * 2
             txns.append(a)
+            self.sendTxn(client, sender, txns, False)
+            txns = []
 
         txns.append(
             transaction.AssetTransferTxn(
@@ -648,6 +632,14 @@ class PortalCore:
         a.fee = a.fee * 2
 
         txns.append(a)
+
+        resp = self.sendTxn(client, sender, txns, True)
+        pprint.pprint(resp.__dict__)
+#        print(encode_address(resp.__dict__["logs"][0]))
+#        print(encode_address(resp.__dict__["logs"][1]))
+#        pprint.pprint(self.parseSeqFromLog(resp))
+
+    def sendTxn(self, client, sender, txns, doWait):
         transaction.assign_group_id(txns)
 
         grp = []
@@ -656,11 +648,10 @@ class PortalCore:
             grp.append(t.sign(pk))
 
         client.send_transactions(grp)
-        resp = self.waitForTransaction(client, grp[-1].get_txid())
-        pprint.pprint(resp.__dict__)
-#        print(encode_address(resp.__dict__["logs"][0]))
-#        print(encode_address(resp.__dict__["logs"][1]))
-#        pprint.pprint(self.parseSeqFromLog(resp))
+        if doWait:
+            return self.waitForTransaction(client, grp[-1].get_txid())
+        else:
+            return grp[-1].get_txid()
 
     def asset_optin_check(self, client, sender, asset, receiver):
         if receiver not in self.asset_cache:
