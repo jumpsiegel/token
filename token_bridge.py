@@ -567,13 +567,13 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 #                   Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
                    FromChain.store(Bytes("base16", "0008")),
-                   Address.store(Global.current_application_address())
+                   Address.store(Txn.application_args[1]),
                ])
             ),
 
             # Correct address len?
             Assert(And(
-                Len(Address.load()) == Int(32),
+                Len(Address.load()) <= Int(32),
                 Len(FromChain.load()) == Int(2),
                 Len(Txn.application_args[3]) <= Int(32)
             )),
@@ -582,6 +582,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Bytes("base16", "01"),
                 Extract(zb.load(), Int(0), Int(24)),
                 Itob(amount.load()),  # 8 bytes
+                Extract(zb.load(), Int(0), Int(32) - Len(Address.load())),
                 Address.load(),
                 FromChain.load(),
                 Extract(zb.load(), Int(0), Int(32) - Len(Txn.application_args[3])),
