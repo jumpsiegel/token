@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Any, Optional, Union
 from base64 import b64decode
 import base64
 import random
+import time
 import hashlib
 import uuid
 import sys
@@ -32,6 +33,8 @@ from algosdk.future.transaction import LogicSig
 from token_bridge import get_token_bridge
 
 from test_app import get_test_app
+
+from algosdk.v2client import indexer
 
 import pprint
 
@@ -92,6 +95,14 @@ class PortalCore:
         self.KMD_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.KMD_WALLET_NAME = "unencrypted-default-wallet"
         self.KMD_WALLET_PASSWORD = ""
+
+        self.INDEXER_TOKEN = "a" * 64
+        self.INDEXER_ADDRESS = 'http://localhost:8980'
+        self.INDEXER_ROUND = 0
+        self.NOTE_PREFIX = 'publishMessage'.encode()
+
+
+        self.myindexer = indexer.IndexerClient(indexer_token=self.INDEXER_TOKEN, indexer_address=self.INDEXER_ADDRESS)
 
         self.seed_amt = int(1002000)  # The black magic in this number... 
         self.cache = {}
@@ -424,6 +435,59 @@ class PortalCore:
     def parseSeqFromLog(self, txn):
         return int.from_bytes(b64decode(txn.innerTxns[0]["logs"][0]), "big")
 
+    def getVAA(self, client, sender, seq, app):
+        # SOOO, we send a nop txn through to push the block forward
+        # one
+
+        # This is ONLY needed on a local net...  the indexer will sit
+        # on the last block for 30 to 60 seconds... we don't want this
+        # log in prod since it is wasteful of gas
+
+        if (self.INDEXER_ROUND > 512):  # until they fix it
+            print("indexer is broken in local net... stop/clean/restart the sandbox")
+            sys.exit(0)
+
+        txns = []
+
+        txns.append(
+            transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"nop"],
+                sp=client.suggested_params(),
+            )
+        )
+        self.sendTxn(client, sender, txns, False)
+
+        while True:
+            nexttoken = ""
+            while True:
+                response = self.myindexer.search_transactions( min_round=self.INDEXER_ROUND, note_prefix=self.NOTE_PREFIX, next_page=nexttoken)
+                for x in response["transactions"]:
+                    for y in x["inner-txns"]:
+                        if y["application-transaction"]["application-id"] != self.coreid:
+                            continue
+                        if len(y["logs"]) == 0:
+                            continue
+                        args = y["application-transaction"]["application-args"]
+                        if len(args) < 2:
+                            continue
+                        if base64.b64decode(args[0]) != b'publishMessage':
+                            continue
+                        seq = int.from_bytes(base64.b64decode(y["logs"][0]), "big")
+                        emitter = y["sender"]
+                        payload = base64.b64decode(args[1])
+                        pprint.pprint([emitter, seq, payload])
+                        sys.exit(0)
+
+                if 'next-token' in response:
+                    nexttoken = response['next-token']
+                else:
+                    self.INDEXER_ROUND = response['current-round'] + 1
+                    break
+            time.sleep(1)
+        
     def publishMessage(self, client, sender, vaa, appid):
         aa = decode_address(get_application_address(appid)).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
@@ -447,7 +511,9 @@ class PortalCore:
 
         resp = self.sendTxn(client, sender, txns, True)
 
-        pprint.pprint(self.parseSeqFromLog(resp))
+        self.INDEXER_ROUND = resp.confirmedRound
+
+        return self.parseSeqFromLog(resp)
 
     def createTestAsset(self, client, sender):
         txns = []
@@ -506,22 +572,16 @@ class PortalCore:
 
         return aid
 
+    def getCreator(self, client, sender, asset_id):
+        return client.asset_info(asset_id)["params"]["creator"]
+
     def testAttest(self, client, sender, asset_id):
         taddr = get_application_address(self.tokenid)
         aa = decode_address(taddr).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
 
-        creator = None
-        assets = client.account_info(sender.getAddress())["assets"]
-        for x in assets:
-            if x["asset-id"] == asset_id:
-                creator = x["creator"]
-                break
-
-        if creator == None:
-            raise Exception("unheld asset")
-
-        c = client.account_info(x["creator"])
+        creator = self.getCreator(client, sender, asset_id)
+        c = client.account_info(creator)
         wormhole = c.get("auth-addr") == taddr
 
         if not wormhole:
@@ -559,17 +619,8 @@ class PortalCore:
         aa = decode_address(taddr).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
 
-        creator = None
-        assets = client.account_info(sender.getAddress())["assets"]
-        for x in assets:
-            if x["asset-id"] == asset_id:
-                creator = x["creator"]
-                break
-
-        if creator == None:
-            raise Exception("unheld asset")
-
-        c = client.account_info(x["creator"])
+        creator = self.getCreator(client, sender, asset_id)
+        c = client.account_info(creator)
         wormhole = c.get("auth-addr") == taddr
 
         txns = []
@@ -1159,9 +1210,15 @@ class PortalCore:
         print("testid " + str(self.testid) + " address " + get_application_address(self.testid))
 
         print("Sending a message payload to the core contract")
-        self.publishMessage(client, player, b"you also suck", self.testid)
+        sid = self.publishMessage(client, player, b"you also suck", self.testid)
+        vaa = self.getVAA(client, player, self.testid, sid)
+        pprint.pprint(vaa)
+        sys.exit(0)
+
         self.publishMessage(client, player2, b"second suck", self.testid)
         self.publishMessage(client, player3, b"last message", self.testid)
+
+        sys.exit(0)
         
         print("Lets create a brand new non-wormhole asset and try to attest and send it out")
         self.testasset = self.createTestAsset(client, player2)

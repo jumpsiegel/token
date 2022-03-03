@@ -2,6 +2,8 @@
 
 sudo python3 -m pip  install  -r requirements.txt 
 
+./sandbox stop; ./sandbox clean; ./sandbox up dev
+
 --
 
 
