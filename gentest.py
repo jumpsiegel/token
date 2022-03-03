@@ -5,6 +5,7 @@ import time
 from Cryptodome.Hash import keccak
 import coincurve
 import base64
+from random import random
 from algosdk.encoding import decode_address
 
 class GenTest:
@@ -182,6 +183,10 @@ class GenTest:
 
         emitter = bytes.fromhex(self.getEmitter(tokenChain))
         return self.createSignedVAA(guardianSet, signers, int(time.time()), nonce, 1, emitter, seq, 32, 0, b)
+
+    def genVaa(self, emitter, seq, payload):
+        nonce = int(random() * 4000000.0)
+        return self.createSignedVAA(1, self.guardianPrivKeys, int(time.time()), nonce, 8, emitter, seq, 32, 0, payload.hex())
 
     def test(self):
         print(self.genTransfer(self.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address("ROOKEPZMHHBAEH75Y44OCNXQAGTXZWG3PY7IYQQCMXO7IG7DJMVHU32YVI"), 8, 0))

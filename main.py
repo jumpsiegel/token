@@ -465,6 +465,7 @@ class PortalCore:
             while True:
                 response = self.myindexer.search_transactions( min_round=self.INDEXER_ROUND, note_prefix=self.NOTE_PREFIX, next_page=nexttoken)
                 for x in response["transactions"]:
+                    pprint.pprint(x)
                     for y in x["inner-txns"]:
                         if y["application-transaction"]["application-id"] != self.coreid:
                             continue
@@ -476,10 +477,11 @@ class PortalCore:
                         if base64.b64decode(args[0]) != b'publishMessage':
                             continue
                         seq = int.from_bytes(base64.b64decode(y["logs"][0]), "big")
-                        emitter = y["sender"]
+                        emitter = decode_address(y["sender"])
                         payload = base64.b64decode(args[1])
-                        pprint.pprint([emitter, seq, payload])
+                        pprint.pprint([seq, y["sender"], payload.hex()])
                         sys.exit(0)
+                        return self.gt.genVaa(emitter, seq, payload)
 
                 if 'next-token' in response:
                     nexttoken = response['next-token']
@@ -612,7 +614,7 @@ class PortalCore:
 #        pprint.pprint(resp.__dict__)
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
-        pprint.pprint(self.parseSeqFromLog(resp))
+        return self.parseSeqFromLog(resp)
 
     def transferAsset(self, client, sender, asset_id, quantity, receiver):
         taddr = get_application_address(self.tokenid)
@@ -1117,6 +1119,7 @@ class PortalCore:
 
     def simple_test(self):
         gt = GenTest()
+        self.gt = gt
 
 #        q = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
 #        pprint.pprint(self.parseVAA(q))
@@ -1211,22 +1214,20 @@ class PortalCore:
 
         print("Sending a message payload to the core contract")
         sid = self.publishMessage(client, player, b"you also suck", self.testid)
-        vaa = self.getVAA(client, player, self.testid, sid)
-        pprint.pprint(vaa)
-        sys.exit(0)
-
         self.publishMessage(client, player2, b"second suck", self.testid)
         self.publishMessage(client, player3, b"last message", self.testid)
 
-        sys.exit(0)
-        
         print("Lets create a brand new non-wormhole asset and try to attest and send it out")
         self.testasset = self.createTestAsset(client, player2)
         
         print("test asset id: " + str(self.testasset))
 
         print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
-        self.testAttest(client, player2, self.testasset)
+        sid = self.testAttest(client, player2, self.testasset)
+        vaa = self.getVAA(client, player, self.testid, sid)
+        v = self.parseVAA(bytes.fromhex(vaa))
+        pprint.pprint((vaa, v))
+        sys.exit(0)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
