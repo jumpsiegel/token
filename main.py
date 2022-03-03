@@ -435,7 +435,9 @@ class PortalCore:
     def parseSeqFromLog(self, txn):
         return int.from_bytes(b64decode(txn.innerTxns[0]["logs"][0]), "big")
 
-    def getVAA(self, client, sender, seq, app):
+    def getVAA(self, client, sender, sid, app):
+        if sid == None:
+            raise Exception("getVAA called with a sid of None")
         # SOOO, we send a nop txn through to push the block forward
         # one
 
@@ -464,6 +466,7 @@ class PortalCore:
             nexttoken = ""
             while True:
                 response = self.myindexer.search_transactions( min_round=self.INDEXER_ROUND, note_prefix=self.NOTE_PREFIX, next_page=nexttoken)
+                pprint.pprint(response)
                 for x in response["transactions"]:
                     pprint.pprint(x)
                     for y in x["inner-txns"]:
@@ -477,10 +480,13 @@ class PortalCore:
                         if base64.b64decode(args[0]) != b'publishMessage':
                             continue
                         seq = int.from_bytes(base64.b64decode(y["logs"][0]), "big")
+                        if seq != sid:
+                            print(str(seq) + " != " + str(sid))
+                            continue
                         emitter = decode_address(y["sender"])
                         payload = base64.b64decode(args[1])
-                        pprint.pprint([seq, y["sender"], payload.hex()])
-                        sys.exit(0)
+#                        pprint.pprint([seq, y["sender"], payload.hex()])
+#                        sys.exit(0)
                         return self.gt.genVaa(emitter, seq, payload)
 
                 if 'next-token' in response:
@@ -572,6 +578,8 @@ class PortalCore:
 
         resp = self.sendTxn(client, sender, txns, True)
 
+#        self.INDEXER_ROUND = resp.confirmedRound
+
         return aid
 
     def getCreator(self, client, sender, asset_id):
@@ -592,8 +600,6 @@ class PortalCore:
         txns = []
         sp = client.suggested_params()
 
-#        pprint.pprint ((c, emitter_addr, creator))
-
         a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
             index=self.tokenid,
@@ -611,7 +617,9 @@ class PortalCore:
 
         resp = self.sendTxn(client, sender, txns, True)
 
-#        pprint.pprint(resp.__dict__)
+        # Point us at the correct round
+        self.INDEXER_ROUND = resp.confirmedRound
+
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
         return self.parseSeqFromLog(resp)
@@ -687,10 +695,13 @@ class PortalCore:
         txns.append(a)
 
         resp = self.sendTxn(client, sender, txns, True)
+
+        self.INDEXER_ROUND = resp.confirmedRound
+
 #        pprint.pprint(resp.__dict__)
 #        print(encode_address(resp.__dict__["logs"][0]))
 #        print(encode_address(resp.__dict__["logs"][1]))
-        pprint.pprint(self.parseSeqFromLog(resp))
+        return self.parseSeqFromLog(resp)
 
     def sendTxn(self, client, sender, txns, doWait):
         transaction.assign_group_id(txns)
@@ -1118,12 +1129,17 @@ class PortalCore:
         pprint.pprint(fees)
 
     def simple_test(self):
-        gt = GenTest()
-        self.gt = gt
-
 #        q = bytes.fromhex(gt.genAssetMeta(gt.guardianPrivKeys, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, 8, b"USDC", b"CircleCoin"))
 #        pprint.pprint(self.parseVAA(q))
 #        sys.exit(0)
+
+
+#        vaa = self.parseVAA(bytes.fromhex("010000000113008596b954143c13b6f034556c82b7a5048bfa5b22e8b2f3de14bd406fc0dff9377ccadb20e843bce9330382160286371ac1d420363a9f84a7ee7d951a800d8d71000187ce48afdbce404562ab11cd8a23e0dec7094e7eddd623eee2a8698a28577fc426282298c9935b7b97e89ab701881d9da6c175b1950b41df4afd3bfed368ccc30002b7c7c13fc19fce3ce8adb179d58c2648d83410fe99ddc01d119b6bbfffd792af24ad367a9e19de5ca4abe8ed7913d90bbeb6333e7112d5e2e668753059f741970103e46fb96adf8252caa40d0b875c08496428794d6bd147096e3918d45815e3a70c5e0e958e343d2a06a9dc005be519feaeb02f17a1f62524a4e0c3129a40c879cb000412c32024f09ad65f7f29098ebeeceac0bf5983555164403d7575119a2525c2b62efb622e22c8b12dd8c43587ac62e070f97faf98e94fd2decbd2bd7d1b5b5f120005f5c3352a3787232460ae1363a54257b9394cca9b49893bb860787acd84e4ed5e4afc31329f64113aeab20d422f8c388d62f1be635304a776a531d2343f2a0b330006fcf2dc5d30b4f249a6fabb124d948dd27725568bfedd3d4343964bfd9b3e442e49ccd74fa140c37f4b0b45d702d516382d07eb2616b2a29223b1e87ab390951d0107eb6049a71158f6eac59aefbbad57daa760ccfc3da6bd2a6e879d76e008fe9fd240e36214ce0bbb3e7a91d028febf233a2c7329614eb8b73b3fb4dda51faba5260108fb3483ebc8840307a411608cb3ea8fcfeef481995348553bd7ce68e5ad4ddeb24ca056e9a18de5dfd28e9d109922828386242b722a1b51b8340ed5a3bdf391fa010906b34cd824fbf5be9edac4025b77a52c65aa1f88b9cb74b8a67be8660a15e1b753db810d0fe1ce6a3ec2d55b9cefae824773c17be29f62b8c160c094d38e29f9010ac11e7875b50bff23427cf3e83897bf80846794b41ba64cf053c45033d411ecd0070195d45bad31554513fb9044e09f151e81e19cc97b39b13a3815d850723283000ba3916b055acc215b304693997b0c868d4a2824b5011a68abe221102266bd370e2b3bca922c43a30c936a776bdf55cd692c7d273072d73241d46877e8002c2b2d010c5d970d6676ebcb0d81fdc611ea86e603d07dca3ba9a6680ef89d57640b906ab237610eb341b575c23a126408f90566189335c3029e21a0b2d4bff660b51ae22f010d457d2a226fd627b37662c5760df0c31addcd2cdd798f85cf6f85785fc3e45cac77ba9d485a1e6096dcf7d94a0366a6b20c9eb2ca18c66ccf988b3b0b71fe5672000e5dfa314015541a2139ee382e90e30cd8d742dc4dbd2231df49a888cf2dd024f023f8f8891b1219ff3317c9464711fb23fb052d2ef331ac1562c894b928c2b983010f9266f8ae6ed1f42411f035f49d6d7dba6469ce1178c52751f17d22c08c7fc6c939a48ca197aa870f69d20ce08e3dd479452845525f42bb4809cabee19e62b84e0010568a5f96cad098cce5ef298ab2f3e8b95ecc9257796b79795b27320d7cf520834b7cc8c7bd82417d68628617c8c0458d7642b992c53db03821ba3700a1bbb052001183dcfac96a9d2c39b2af201da4da27c9e9b68433d3b035119d26ae49117d8f50385831366d63bec75151378fcfcab0d4e3b35141d4c5c063e98503e98f1b8502011269e4312750d8d0c94b2ccde9f02527cd70d05cbac86f0bcd5226b2a2780399e422d13ce18e4badc0a190ca6e4f429eb8f5ab68d06a7e5d7288e1047a5a3a3bfd016220f69b000f5a090008ff6fe3a8c6b5983bfa1f4ea4c48560cf956cdb94107f470c77bc446ad199bf4b0000000000000002200200000000000000000000000000000000000000000000000000000000000003bf0008087465737441737365000000000000000000000000000000000000000000000000546573744173736574000000000000000000000000000000000000000000000000"))
+#        pprint.pprint(vaa)
+#        sys.exit(0)
+
+        gt = GenTest()
+        self.gt = gt
 
         client = self.getAlgodClient()
 
@@ -1224,16 +1240,19 @@ class PortalCore:
 
         print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
         sid = self.testAttest(client, player2, self.testasset)
-        vaa = self.getVAA(client, player, self.testid, sid)
+        vaa = self.getVAA(client, player, sid, self.testid)
         v = self.parseVAA(bytes.fromhex(vaa))
-        pprint.pprint((vaa, v))
-        sys.exit(0)
+        print("We got a " + v["Meta"])
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
         print("Lets transfer that asset to one of our other accounts")
-        self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+        sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+        vaa = self.getVAA(client, player, sid, self.testid)
+        v = self.parseVAA(bytes.fromhex(vaa))
+        print("We got a " + v["Meta"])
+        pprint.pprint(v)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))

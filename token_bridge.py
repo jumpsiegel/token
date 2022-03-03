@@ -550,7 +550,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
             If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
                Seq([
-                   Log(Bytes("Wormhole wrapped")),
+#                   Log(Bytes("Wormhole wrapped")),
 
                    asset.store(blob.read(Int(2), Int(0), Int(8))),
                    # This the correct asset?
@@ -564,7 +564,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                    Assert(Txn.accounts[2] == get_sig_address(Btoi(FromChain.load()), Address.load())),
                ]),
                Seq([
-                   Log(Bytes("Non Wormhole wrapped")),
+#                   Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
                    FromChain.store(Bytes("base16", "0008")),
                    Address.store(Global.current_application_address())
@@ -590,6 +590,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Extract(zb.load(), Int(0), Int(32))
             )),
 
+            Assert(Len(p.load()) == Int(133)),
 
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
@@ -651,7 +652,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
             If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
                Seq([
-                   #Log(Bytes("Wormhole wrapped")),
+#                   Log(Bytes("Wormhole wrapped")),
                    # Wormhole wrapped asset
                    asset.store(blob.read(Int(2), Int(0), Int(8))),
                    # This the correct asset?
@@ -671,7 +672,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                    p.store(blob.read(Int(2), Int(8), Int(108)))
                ]),
                Seq([
-                   #Log(Bytes("Non Wormhole wrapped")),
+#                   Log(Bytes("Non Wormhole wrapped")),
                    Assert(Txn.accounts[2] == get_sig_address(aid.load(), Bytes("native"))),
 
                    zb.store(Bytes("base16", "0000000000000000000000000000000000000000000000000000000000000000")),
@@ -699,12 +700,13 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                            Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
                            #Name [32]uint8
                            name.load(),
-                           Extract(zb.load(), Int(0), Int(32) - Len(uname.load())),
+                           Extract(zb.load(), Int(0), Int(32) - Len(name.load())),
                        )
                    ),
                ])
                ),
 
+            Assert(Len(p.load()) == Int(100)),
 
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
