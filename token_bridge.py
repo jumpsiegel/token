@@ -163,8 +163,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Gtxn[Txn.group_index() - Int(1)].application_args[1] == Txn.application_args[1],
 
                 # What checks should I give myself
-                Gtxn[Txn.group_index()].rekey_to() == Global.zero_address(),
-                Gtxn[Txn.group_index()].sender() == Txn.sender(),
+                Txn.rekey_to() == Global.zero_address(),
 
                 # We all opted into the same accounts?
                 Gtxn[Txn.group_index() - Int(1)].accounts[0] == Txn.accounts[0],
