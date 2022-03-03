@@ -1251,8 +1251,17 @@ class PortalCore:
         sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
         vaa = self.getVAA(client, player, sid, self.testid)
         v = self.parseVAA(bytes.fromhex(vaa))
-        print("We got a " + v["Meta"])
-        pprint.pprint(v)
+        s = { "Meta": v["Meta"],
+              "Contract": v["Contract"],
+              "_Contract": encode_address(bytes.fromhex(v["Contract"])),
+              "ToAddress": v["ToAddress"],
+              "_ToAddress": encode_address(bytes.fromhex(v["ToAddress"])),
+              "toAddress": player3.getAddress(),
+              "_emitter": v["emitter"],
+              "_emitter": encode_address(v["emitter"])
+             }
+        pprint.pprint(s)
+        sys.exit(0)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
