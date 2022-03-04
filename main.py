@@ -466,9 +466,9 @@ class PortalCore:
             nexttoken = ""
             while True:
                 response = self.myindexer.search_transactions( min_round=self.INDEXER_ROUND, note_prefix=self.NOTE_PREFIX, next_page=nexttoken)
-                pprint.pprint(response)
+#                pprint.pprint(response)
                 for x in response["transactions"]:
-                    pprint.pprint(x)
+#                    pprint.pprint(x)
                     for y in x["inner-txns"]:
                         if y["application-transaction"]["application-id"] != self.coreid:
                             continue
@@ -481,7 +481,7 @@ class PortalCore:
                             continue
                         seq = int.from_bytes(base64.b64decode(y["logs"][0]), "big")
                         if seq != sid:
-                            print(str(seq) + " != " + str(sid))
+#                            print(str(seq) + " != " + str(sid))
                             continue
                         emitter = decode_address(y["sender"])
                         payload = base64.b64decode(args[1])
@@ -1099,19 +1099,23 @@ class PortalCore:
 
         if p["Meta"] == "TokenBridge Transfer":
             foreign_assets = []
+            a = 0
             if p["FromChain"] != 8:
                 asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
                 if (len(asset) > 8):
-                    foreign_assets.append(int.from_bytes(asset[0:8], "big"))
+                    a = int.from_bytes(asset[0:8], "big")
             else:
-                foreign_assets.append(int.from_bytes(bytes.fromhex(p["Contract"]), "big"))
+                a = int.from_bytes(bytes.fromhex(p["Contract"]), "big")
 
             # The receiver needs to be optin in to receive the coins... Yeah, the relayer pays for this
-            self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
+
+            if a != 0:
+                foreign_assets.append(a)
+                self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
 
             # And this is how the relayer gets paid...
-            if p["Fee"] != self.zeroPadBytes:
-                self.asset_optin(client, sender, foreign_assets[0], sender.getAddress())
+                if p["Fee"] != self.zeroPadBytes:
+                    self.asset_optin(client, sender, foreign_assets[0], sender.getAddress())
 
             txns.append(transaction.ApplicationCallTxn(
                 sender=sender.getAddress(),
@@ -1155,7 +1159,7 @@ class PortalCore:
 #        sys.exit(0)
 
 
-#        vaa = self.parseVAA(bytes.fromhex("010000000113008596b954143c13b6f034556c82b7a5048bfa5b22e8b2f3de14bd406fc0dff9377ccadb20e843bce9330382160286371ac1d420363a9f84a7ee7d951a800d8d71000187ce48afdbce404562ab11cd8a23e0dec7094e7eddd623eee2a8698a28577fc426282298c9935b7b97e89ab701881d9da6c175b1950b41df4afd3bfed368ccc30002b7c7c13fc19fce3ce8adb179d58c2648d83410fe99ddc01d119b6bbfffd792af24ad367a9e19de5ca4abe8ed7913d90bbeb6333e7112d5e2e668753059f741970103e46fb96adf8252caa40d0b875c08496428794d6bd147096e3918d45815e3a70c5e0e958e343d2a06a9dc005be519feaeb02f17a1f62524a4e0c3129a40c879cb000412c32024f09ad65f7f29098ebeeceac0bf5983555164403d7575119a2525c2b62efb622e22c8b12dd8c43587ac62e070f97faf98e94fd2decbd2bd7d1b5b5f120005f5c3352a3787232460ae1363a54257b9394cca9b49893bb860787acd84e4ed5e4afc31329f64113aeab20d422f8c388d62f1be635304a776a531d2343f2a0b330006fcf2dc5d30b4f249a6fabb124d948dd27725568bfedd3d4343964bfd9b3e442e49ccd74fa140c37f4b0b45d702d516382d07eb2616b2a29223b1e87ab390951d0107eb6049a71158f6eac59aefbbad57daa760ccfc3da6bd2a6e879d76e008fe9fd240e36214ce0bbb3e7a91d028febf233a2c7329614eb8b73b3fb4dda51faba5260108fb3483ebc8840307a411608cb3ea8fcfeef481995348553bd7ce68e5ad4ddeb24ca056e9a18de5dfd28e9d109922828386242b722a1b51b8340ed5a3bdf391fa010906b34cd824fbf5be9edac4025b77a52c65aa1f88b9cb74b8a67be8660a15e1b753db810d0fe1ce6a3ec2d55b9cefae824773c17be29f62b8c160c094d38e29f9010ac11e7875b50bff23427cf3e83897bf80846794b41ba64cf053c45033d411ecd0070195d45bad31554513fb9044e09f151e81e19cc97b39b13a3815d850723283000ba3916b055acc215b304693997b0c868d4a2824b5011a68abe221102266bd370e2b3bca922c43a30c936a776bdf55cd692c7d273072d73241d46877e8002c2b2d010c5d970d6676ebcb0d81fdc611ea86e603d07dca3ba9a6680ef89d57640b906ab237610eb341b575c23a126408f90566189335c3029e21a0b2d4bff660b51ae22f010d457d2a226fd627b37662c5760df0c31addcd2cdd798f85cf6f85785fc3e45cac77ba9d485a1e6096dcf7d94a0366a6b20c9eb2ca18c66ccf988b3b0b71fe5672000e5dfa314015541a2139ee382e90e30cd8d742dc4dbd2231df49a888cf2dd024f023f8f8891b1219ff3317c9464711fb23fb052d2ef331ac1562c894b928c2b983010f9266f8ae6ed1f42411f035f49d6d7dba6469ce1178c52751f17d22c08c7fc6c939a48ca197aa870f69d20ce08e3dd479452845525f42bb4809cabee19e62b84e0010568a5f96cad098cce5ef298ab2f3e8b95ecc9257796b79795b27320d7cf520834b7cc8c7bd82417d68628617c8c0458d7642b992c53db03821ba3700a1bbb052001183dcfac96a9d2c39b2af201da4da27c9e9b68433d3b035119d26ae49117d8f50385831366d63bec75151378fcfcab0d4e3b35141d4c5c063e98503e98f1b8502011269e4312750d8d0c94b2ccde9f02527cd70d05cbac86f0bcd5226b2a2780399e422d13ce18e4badc0a190ca6e4f429eb8f5ab68d06a7e5d7288e1047a5a3a3bfd016220f69b000f5a090008ff6fe3a8c6b5983bfa1f4ea4c48560cf956cdb94107f470c77bc446ad199bf4b0000000000000002200200000000000000000000000000000000000000000000000000000000000003bf0008087465737441737365000000000000000000000000000000000000000000000000546573744173736574000000000000000000000000000000000000000000000000"))
+#        vaa = self.parseVAA(bytes.fromhex("01000000011300824c52c3006f0bce5a232b2a09254f894bbf48a0f1c0a47236cc251d99831dc42fce18f34ce35b054f9f2ac2d5e3549654e971c89eeb89803012a8a3ef5476c40001550ba2b7d7692711edf31dcf4b94464d0f7b83862591d1dc0b2672f47181945b4a1542cc35eccf6c675ac80d897be0822e47983696dfbe23e1888e9d36dc72940102bab0321d45d8c8f004c15e5b0ede287d72c967d6d7b654846002796600bd7ac859a7136d777f7157ba05985230343c25ee22bef64f0528d3237f45e2e5c1cc000103694388fbca8bf9d42de22b6d2012516a2fa798ec95c6f2ad6ff54f6f376fba262e436f40d4191d2898fb3fd8d79f9341c2be38ea525772650a5f8bc3ee5fa3a00104a57a8383a2f707e98b7ab2f961652b4d727a64db6188c538e72f759a102ba62f1056d0808bbe9a64fc60f080c90b015295eaa620b3e188c81dd876bb694a1dcf0005efa216354b821c8488e1633a13bdd716c5e66ae3f43b895fb821bd0291cc53fc7af91a665662421d815ca9fc15887027c91aa84022c23d4f38e2ee09eed49a8f00063f53dff770e70cea6e2750f771cb462864988d3038f6b266a1e03b956a1a8dab000585aa41cc43f6974d9f4c5cb49f560962115554684fa92136fd794084572e000732a28ef7a2831ed977813cd2b2e789840eb898fc14658b58eab6c2290ea0a73414edf76d3cde2c148d663b2ddb3ee27bb4de1c42d3310b575f0e99ac62f857f90008653143d0e5dbf5fa7dca753a5516379bddfdd4008d64c506f7a02b1311ffa80e21c6d56971182c4faeab38a1ebe23ce6b3a43172a01294d735e2fe6ba118aeeb0009dac4a120d4c6b51f8e27ff52f116ffaf0e8ebdda575c8cee0af7a18e33562c9a0bf7948a11af871f56fb6184b33c1f3df1f8269f4f2366fb45714dd88b8e0077010a17221ee2c340c5de1d6a7112a8c31a322ec0de9d051e61225e62907a8f3309ab200584d4c980098af1bddeb0f1129834f2518a623c30819aa0f6af2a202f471c010b61eb98efbbdc32d73372a4eb9d29795efa571d15855360ba71ace3cef333c60a30bd95439052740567e84bd6f361ed1f413c257010e67754b5f1c9723a9587f8000c9af742874d8e4a11bcc17ddfdad55c61cd8090f34d33e2a576b1e36a07af82c6099bffc8e4f9d887c4933266ca8c362e0bec0f0dea065e1944465ad8813e34ae010deddbcc9b74e15757fd1e5b71b63c92eb42a6929d24806e8f3092da946c369f556bf7ef1e7c9345524844703387c00a04439b7e90e68acdb008c466f8b4c9cc1e010efd779d005e30395b41bc4a4296a693286f23f385dbf5ea53cc06ebebd2d35cb13efe1b4d5e2e49aaa9ef1a09e1ed5fd21189f7ee230cb90be1708fbbc423d92d010f06fe0519195c3ae8706a2051924854b78ee37ab9e186c4df7986abb6311b3d5216a0c67ef40c4cd7df0b1234a625ab05de6789a633effef2daada2943ee7100e0110fdf02517186467aa2361cd092459d771944e7fe31f194c98fede059bc685e9055e0a2ecacc6a748e356397b116acc212d22efd85a7f24cee4cc88d5355e9f68501111033706847bbd4eefbbf5a39cbfbcbff809835166a6297707523ad6bf48203e111f3ac5e774f57b22e66833f79a03e8ebad70644edb2f37c21d6ed5093580ace0112287e2ae31dd9efac5051f1b375cbb95a59f46ac85a6967916f98688b1200339b0a003734379624933eb68e659022877b0a1d4de50c02a9978534ffcc684eda1900622267030026eb6800085b4a13df47196af4a9e256e339481b50537054863778fe01bb9c29689e5949e000000000000000032001000000000000000000000000000000000000000000000000000000000098968000000000000000000000000000000000000000000000000000000000000000000008033130fc322c2042da2c8fed5cfbfc96bbf7d1eca687ca17110be1686eee7c3a00080000000000000000000000000000000000000000000000000000000000000000"))
 #        pprint.pprint(vaa)
 #        sys.exit(0)
 
@@ -1233,12 +1237,12 @@ class PortalCore:
 
         print("Transfer the asset " + str(seq))
         transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
-#        self.submitVAA(transferVAA, client, player)
-#        seq += 1
-#
-#        aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
-#        print("generate an attest of the asset we just received")
-#        self.testAttest(client, player, aid)
+        self.submitVAA(transferVAA, client, player)
+        seq += 1
+
+        aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
+        print("generate an attest of the asset we just received")
+        self.testAttest(client, player, aid)
 
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
@@ -1269,25 +1273,26 @@ class PortalCore:
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
-        print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
-        sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+#        print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
+#        sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+#        print("... track down the generated VAA")
+#        vaa = self.getVAA(client, player, sid, self.testid)
+#        print(".. and lets pass that to player3")
+#        self.submitVAA(bytes.fromhex(vaa), client, player3)
+
+#        pprint.pprint(self.getBalances(client, player2.getAddress()))
+#        pprint.pprint(self.getBalances(client, player3.getAddress()))
+
+        print("Lets transfer algo this time.... first lets create the vaa")
+        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
         print("... track down the generated VAA")
         vaa = self.getVAA(client, player, sid, self.testid)
+#        pprint.pprint(vaa)
         print(".. and lets pass that to player3")
         self.submitVAA(bytes.fromhex(vaa), client, player3)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
-
-#        print("Lets transfer algo this time.... first lets create the vaa")
-#        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
-#        print("... track down the generated VAA")
-#        vaa = self.getVAA(client, player, sid, self.testid)
-#        print(".. and lets pass that to player3")
-#        self.submitVAA(bytes.fromhex(vaa), client, player3)
-#
-#        pprint.pprint(self.getBalances(client, player2.getAddress()))
-#        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))

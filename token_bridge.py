@@ -573,6 +573,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         d = ScratchVar()
         p = ScratchVar()
         asset = ScratchVar()
+        aaddr = ScratchVar()
         Address = ScratchVar()
         FromChain = ScratchVar()
         zb = ScratchVar()
@@ -632,8 +633,13 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # If it is nothing but dust lets just abort the whole transaction and save 
             Assert(amount.load() > Int(0)),
 
+
+            If(aid.load() != Int(0),
+               aaddr.store(auth_addr(extract_creator(aid.load()))),
+               aaddr.store(Bytes(""))),
+            
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
-            If(((aid.load() != Int(0)) and (auth_addr(extract_creator(aid.load())) == Global.current_application_address())),
+            If(aaddr.load() == Global.current_application_address(),
                Seq([
 #                   Log(Bytes("Wormhole wrapped")),
 
