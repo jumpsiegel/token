@@ -1273,15 +1273,15 @@ class PortalCore:
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
-#        print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
-#        sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
-#        print("... track down the generated VAA")
-#        vaa = self.getVAA(client, player, sid, self.testid)
-#        print(".. and lets pass that to player3")
-#        self.submitVAA(bytes.fromhex(vaa), client, player3)
+        print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
+        sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+        print("... track down the generated VAA")
+        vaa = self.getVAA(client, player, sid, self.testid)
+        print(".. and lets pass that to player3")
+        self.submitVAA(bytes.fromhex(vaa), client, player3)
 
-#        pprint.pprint(self.getBalances(client, player2.getAddress()))
-#        pprint.pprint(self.getBalances(client, player3.getAddress()))
+        pprint.pprint(self.getBalances(client, player2.getAddress()))
+        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
         print("Lets transfer algo this time.... first lets create the vaa")
         sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
