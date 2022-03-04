@@ -367,6 +367,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         off = ScratchVar()
         
         Chain = ScratchVar()
+        Emitter = ScratchVar()
 
         Amount = ScratchVar()
         Origin = ScratchVar()
@@ -375,6 +376,9 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
         DestChain = ScratchVar()
         Fee = ScratchVar()
         asset = ScratchVar()
+
+        factor = ScratchVar()
+        d = ScratchVar()
         
         return Seq([
             checkForDuplicate(),
@@ -399,13 +403,14 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             off.store(Btoi(Extract(Txn.application_args[1], Int(5), Int(1))) * Int(66) + Int(6) + Int(8)), # The offset of the chain
 
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
-
-            Assert(Chain.load() != Int(8)),
+            Emitter.store(Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
 
             # We coming from the correct emitter on the sending chain for the token bridge
-            Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
-                   == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
-            
+            # ... This is 90% of the security...
+            If(Chain.load() == Int(8),
+               Assert(Global.current_application_address() == Emitter.load()), # This came from us?
+               Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) == Emitter.load())),
+
             off.store(off.load()+Int(43)),
 
             # This is a transfer message... right?
@@ -420,22 +425,86 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             # TODO: add assert that the first 24 bytes are zero
             Fee.store(           Btoi(Extract(Txn.application_args[1], off.load() + Int(125),Int(8)))),  # uint256
 
-            # Gonna pay for the fee transfer?
-            If(Fee.load() > Int(0), Assert(Gtxn[Txn.group_index() - Int(1)].amount() >= Int(2000))),
+            # This directed at us?
+            Assert(DestChain.load() == Int(8)),
 
-            # Lets see if we've seen this asset before
-            asset.store(Btoi(blob.read(Int(3), Int(0), Int(8)))),
+            If(OriginChain.load() == Int(8),
+               Seq([
+                   asset.store(Btoi(Extract(Origin.load(), Int(24), Int(8)))),
+                   Assert(Txn.accounts[3] == get_sig_address(asset.load(), Bytes("native"))),
+                   # Now, the horrible part... we have to scale the amount back out to compensate for the "dedusting" 
+                   # when this was sent...
 
-            Assert(And(
-                # Directed at this chain?
-                DestChain.load() == Int(8),
-                # This a asset we know about?
-                asset.load() != Int(0),
-                # Did they hand us the correct address? (no hacky hacky)
-                Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())
-            )),
+                   If(asset.load() == Int(0),
+                      Seq([
+                          Log(Bytes("Its ALGORAND! holy poop!  THIS HAS NOT BEEN TESTED YET")),
+
+                          InnerTxnBuilder.Begin(),
+                          InnerTxnBuilder.SetFields(
+                              {
+                                  TxnField.sender: Txn.accounts[3],
+                                  TxnField.type_enum: TxnType.Payment,
+                                  TxnField.receiver: Destination.load(),
+                                  TxnField.amount: Amount.load(),
+                                  TxnField.fee: Int(0),
+                              }
+                          ),
+                          InnerTxnBuilder.Submit(),
+
+                          If(Fee.load() > Int(0), Seq([
+                                  InnerTxnBuilder.Begin(),
+                                  InnerTxnBuilder.SetFields(
+                                      {
+                                          TxnField.sender: Txn.accounts[3],
+                                          TxnField.type_enum: TxnType.Payment,
+                                          TxnField.receiver: Txn.sender(),
+                                          TxnField.amount: Fee.load(),
+                                          TxnField.fee: Int(0),
+                                      }
+                                  ),
+                                  InnerTxnBuilder.Submit(),
+                          ])),
+
+                          Approve()
+                      ]),            # End of special case for algo
+                      Seq([          # Start of handling code for algorand tokens
+                          factor.store(Int(1)),
+                          d.store(Btoi(extract_decimal(asset.load()))),
+                          Cond(
+                              [d.load() == Int(9),  factor.store(Int(10))],
+                              [d.load() == Int(10), factor.store(Int(100))],
+                              [d.load() == Int(11), factor.store(Int(1000))],
+                              [d.load() == Int(12), factor.store(Int(10000))],
+                              [d.load() == Int(13), factor.store(Int(100000))],
+                              [d.load() == Int(14), factor.store(Int(1000000))],
+                              [d.load() == Int(15), factor.store(Int(10000000))],
+                              [d.load() == Int(16), factor.store(Int(100000000))],
+                              [d.load() >  Int(16), Assert(d.load() < Int(16))],
+                          ),
+                          If(factor.load() != Int(1),
+                             Seq([
+                                 Amount.store(Amount.load() * factor.load()),
+                                 Fee.store(Fee.load() * factor.load())
+                             ])
+                          ),       # If(factor.load() != Int(1),
+                      ])           # End of handling code for algorand tokens
+                   ),              # If(asset.load() == Int(0),
+               ]),                 # If(OriginChain.load() == Int(8),
+
+               # OriginChain.load() != Int(8),
+               Seq([
+                   # Lets see if we've seen this asset before
+                   asset.store(Btoi(blob.read(Int(3), Int(0), Int(8)))),
+                   Assert(And(
+                       asset.load() != Int(0),
+                       Txn.accounts[3] == get_sig_address(OriginChain.load(), Origin.load())
+                     )
+                   ),
+               ])  # OriginChain.load() != Int(8),
+            ),  #  If(OriginChain.load() == Int(8)
 
             # Actually send the coins...
+            Log(Bytes("Main")),
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                 {
@@ -450,6 +519,7 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
             InnerTxnBuilder.Submit(),
 
             If(Fee.load() > Int(0), Seq([
+                    Log(Bytes("Fees")),
                     InnerTxnBuilder.Begin(),
                     InnerTxnBuilder.SetFields(
                         {

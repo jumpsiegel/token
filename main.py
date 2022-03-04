@@ -1215,12 +1215,12 @@ class PortalCore:
 
         print("Transfer the asset " + str(seq))
         transferVAA = bytes.fromhex(gt.genTransfer(gt.guardianPrivKeys, 1, 1, 1, 1, bytes.fromhex("4523c3F29447d1f32AEa95BEBD00383c4640F1b4"), 1, decode_address(player.getAddress()), 8, 0))
-        self.submitVAA(transferVAA, client, player)
-        seq += 1
-
-        aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
-        print("generate an attest of the asset we just received")
-        self.testAttest(client, player, aid)
+#        self.submitVAA(transferVAA, client, player)
+#        seq += 1
+#
+#        aid = client.account_info(player.getAddress())["assets"][0]["asset-id"]
+#        print("generate an attest of the asset we just received")
+#        self.testAttest(client, player, aid)
 
         print("Create the test app we will use to torture ourselves using a new player")
         player2 = self.getTemporaryAccount(client)
