@@ -629,9 +629,14 @@ class PortalCore:
         aa = decode_address(taddr).hex()
         emitter_addr = self.optin(client, sender, self.coreid, 0, aa)
 
-        creator = self.getCreator(client, sender, asset_id)
-        c = client.account_info(creator)
-        wormhole = c.get("auth-addr") == taddr
+        # asset_id 0 is ALGO
+
+        if asset_id == 0:
+            wormhole = False
+        else:
+            creator = self.getCreator(client, sender, asset_id)
+            c = client.account_info(creator)
+            wormhole = c.get("auth-addr") == taddr
 
         txns = []
 
@@ -641,7 +646,7 @@ class PortalCore:
 
         sp = client.suggested_params()
 
-        if not self.asset_optin_check(client, sender, asset_id, creator):
+        if (asset_id != 0) and (not self.asset_optin_check(client, sender, asset_id, creator)):
             print("Looks like we need to optin")
 
             txns.append(
@@ -669,15 +674,22 @@ class PortalCore:
             self.sendTxn(client, sender, txns, False)
             txns = []
 
-        txns.append(
-            transaction.AssetTransferTxn(
-                sender = sender.getAddress(), 
-                sp = sp, 
-                receiver = creator,
-                amt = quantity,
-                index = asset_id
-            )
-        )
+        if asset_id == 0:
+            txns.append(transaction.PaymentTxn(
+                sender=sender.getAddress(),
+                receiver=creator,
+                amt=quantity,
+                sp=sp,
+            ))
+        else:
+            txns.append(
+                transaction.AssetTransferTxn(
+                    sender = sender.getAddress(), 
+                    sp = sp, 
+                    receiver = creator,
+                    amt = quantity,
+                    index = asset_id
+                ))
 
         a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
@@ -1261,15 +1273,15 @@ class PortalCore:
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
-#        print("Lets transfer algo this time.... first lets create the vaa")
-#        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
-#        print("... track down the generated VAA")
-#        vaa = self.getVAA(client, player, sid, self.testid)
-#        print(".. and lets pass that to player3")
-#        self.submitVAA(bytes.fromhex(vaa), client, player3)
-#
-#        pprint.pprint(self.getBalances(client, player2.getAddress()))
-#        pprint.pprint(self.getBalances(client, player3.getAddress()))
+        print("Lets transfer algo this time.... first lets create the vaa")
+        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
+        print("... track down the generated VAA")
+        vaa = self.getVAA(client, player, sid, self.testid)
+        print(".. and lets pass that to player3")
+        self.submitVAA(bytes.fromhex(vaa), client, player3)
+
+        pprint.pprint(self.getBalances(client, player2.getAddress()))
+        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))

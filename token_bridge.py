@@ -589,37 +589,51 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
                 Global.group_size() == Int(2),
 
                 Len(Txn.application_args[3]) <= Int(32),
-
-                # The previous txn is the asset transfer itself
-                Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
-                Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
-                Gtxn[Txn.group_index() - Int(1)].xfer_asset() == aid.load(),
-                Gtxn[Txn.group_index() - Int(1)].asset_receiver() == Txn.accounts[2],
-                Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
             )),
 
+                # The previous txn is the asset transfer itself
             aid.store(Btoi(Txn.application_args[1])),
-            amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
-            d.store(Btoi(extract_decimal(aid.load()))),
+            If(aid.load() == Int(0),
+               Seq([
+                   Assert(And(
+                       Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.Payment,
+                       Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                       Gtxn[Txn.group_index() - Int(1)].receiver() == Txn.accounts[2],
+                       Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+                   )),
+                   amount.store(Gtxn[Txn.group_index() - Int(1)].amount()),
+               ]),
+               Seq([
+                   Assert(And(
+                       Gtxn[Txn.group_index() - Int(1)].type_enum() == TxnType.AssetTransfer,
+                       Gtxn[Txn.group_index() - Int(1)].sender() == Txn.sender(),
+                       Gtxn[Txn.group_index() - Int(1)].xfer_asset() == aid.load(),
+                       Gtxn[Txn.group_index() - Int(1)].asset_receiver() == Txn.accounts[2],
+                       Gtxn[Txn.group_index() - Int(1)].rekey_to() == Global.zero_address(),
+                   )),
+                   amount.store(Gtxn[Txn.group_index() - Int(1)].asset_amount()),
+                   d.store(Btoi(extract_decimal(aid.load()))),
 
-            # Throw away the dust..
-            Cond(
-                [d.load() == Int(9),  amount.store(amount.load() / Int(10))],
-                [d.load() == Int(10), amount.store(amount.load() / Int(100))],
-                [d.load() == Int(11), amount.store(amount.load() / Int(1000))],
-                [d.load() == Int(12), amount.store(amount.load() / Int(10000))],
-                [d.load() == Int(13), amount.store(amount.load() / Int(100000))],
-                [d.load() == Int(14), amount.store(amount.load() / Int(1000000))],
-                [d.load() == Int(15), amount.store(amount.load() / Int(10000000))],
-                [d.load() == Int(16), amount.store(amount.load() / Int(100000000))],
-                [d.load() >  Int(16), Assert(d.load() < Int(16))],
+                   # Throw away the dust..
+                   Cond(
+                       [d.load() == Int(9),  amount.store(amount.load() / Int(10))],
+                       [d.load() == Int(10), amount.store(amount.load() / Int(100))],
+                       [d.load() == Int(11), amount.store(amount.load() / Int(1000))],
+                       [d.load() == Int(12), amount.store(amount.load() / Int(10000))],
+                       [d.load() == Int(13), amount.store(amount.load() / Int(100000))],
+                       [d.load() == Int(14), amount.store(amount.load() / Int(1000000))],
+                       [d.load() == Int(15), amount.store(amount.load() / Int(10000000))],
+                       [d.load() == Int(16), amount.store(amount.load() / Int(100000000))],
+                       [d.load() >  Int(16), Assert(d.load() < Int(16))],
+                   ),
+               ]),
             ),
 
             # If it is nothing but dust lets just abort the whole transaction and save 
             Assert(amount.load() > Int(0)),
 
             # Is the authorizing signature of the creator of the asset the address of the token_bridge app itself?
-            If(auth_addr(extract_creator(aid.load())) == Global.current_application_address(),
+            If(((aid.load() != Int(0)) and (auth_addr(extract_creator(aid.load())) == Global.current_application_address())),
                Seq([
 #                   Log(Bytes("Wormhole wrapped")),
 
