@@ -1243,6 +1243,7 @@ class PortalCore:
 
         print("Lets try to create an attest for a non-wormhole thing with a huge number of decimals")
         sid = self.testAttest(client, player2, self.testasset)
+        print("... track down the generated VAA")
         vaa = self.getVAA(client, player, sid, self.testid)
         v = self.parseVAA(bytes.fromhex(vaa))
         print("We got a " + v["Meta"])
@@ -1252,24 +1253,23 @@ class PortalCore:
 
         print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
         sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
+        print("... track down the generated VAA")
         vaa = self.getVAA(client, player, sid, self.testid)
-#        v = self.parseVAA(bytes.fromhex(vaa))
-#        s = { "Meta": v["Meta"],
-#              "Contract": v["Contract"],
-#              "_Contract": encode_address(bytes.fromhex(v["Contract"])),
-#              "ToAddress": v["ToAddress"],
-#              "_ToAddress": encode_address(bytes.fromhex(v["ToAddress"])),
-#              "toAddress": player3.getAddress(),
-#              "_emitter": v["emitter"],
-#              "_emitter": encode_address(v["emitter"])
-#             }
-#        pprint.pprint(s)
-
         print(".. and lets pass that to player3")
         self.submitVAA(bytes.fromhex(vaa), client, player3)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
+
+#        print("Lets transfer algo this time.... first lets create the vaa")
+#        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
+#        print("... track down the generated VAA")
+#        vaa = self.getVAA(client, player, sid, self.testid)
+#        print(".. and lets pass that to player3")
+#        self.submitVAA(bytes.fromhex(vaa), client, player3)
+#
+#        pprint.pprint(self.getBalances(client, player2.getAddress()))
+#        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))
