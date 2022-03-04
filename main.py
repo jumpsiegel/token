@@ -675,13 +675,16 @@ class PortalCore:
             txns = []
 
         if asset_id == 0:
+            print("asset_id == 0")
             txns.append(transaction.PaymentTxn(
                 sender=sender.getAddress(),
                 receiver=creator,
                 amt=quantity,
                 sp=sp,
             ))
+            accounts=[emitter_addr, creator, creator]
         else:
+            print("asset_id != 0")
             txns.append(
                 transaction.AssetTransferTxn(
                     sender = sender.getAddress(), 
@@ -690,6 +693,9 @@ class PortalCore:
                     amt = quantity,
                     index = asset_id
                 ))
+            accounts=[emitter_addr, creator, c["address"]]
+
+        print(accounts)
 
         a = transaction.ApplicationCallTxn(
             sender=sender.getAddress(),
@@ -698,7 +704,7 @@ class PortalCore:
             app_args=[b"sendTransfer", asset_id, quantity, decode_address(receiver), 8, 0],
             foreign_apps = [self.coreid],
             foreign_assets = [asset_id],
-            accounts=[emitter_addr, creator, c["address"]],
+            accounts=accounts,
             sp=sp
         )
 
@@ -1273,15 +1279,15 @@ class PortalCore:
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
-        print("Lets transfer algo this time.... first lets create the vaa")
-        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
-        print("... track down the generated VAA")
-        vaa = self.getVAA(client, player, sid, self.testid)
-        print(".. and lets pass that to player3")
-        self.submitVAA(bytes.fromhex(vaa), client, player3)
-
-        pprint.pprint(self.getBalances(client, player2.getAddress()))
-        pprint.pprint(self.getBalances(client, player3.getAddress()))
+#        print("Lets transfer algo this time.... first lets create the vaa")
+#        sid = self.transferAsset(client, player2, 0, 10000000, player3.getAddress())
+#        print("... track down the generated VAA")
+#        vaa = self.getVAA(client, player, sid, self.testid)
+#        print(".. and lets pass that to player3")
+#        self.submitVAA(bytes.fromhex(vaa), client, player3)
+#
+#        pprint.pprint(self.getBalances(client, player2.getAddress()))
+#        pprint.pprint(self.getBalances(client, player3.getAddress()))
 
 #        print("player account: " + player.getAddress())
 #        pprint.pprint(client.account_info(player.getAddress()))
