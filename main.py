@@ -752,8 +752,8 @@ class PortalCore:
         signed_optin = optin_txn.sign(sender.getPrivateKey())
         client.send_transactions([signed_optin])
         resp = self.waitForTransaction(client, signed_optin.get_txid())
-        pprint.pprint(resp.__dict__)
-        self.asset_cache[receiver][asset] = True
+        assert self.asset_optin_check(client, sender, asset, receiver), "The optin failed"
+        print("woah! optin succeeded")
 
     def parseVAA(self, vaa):
 #        print (vaa.hex())
@@ -939,12 +939,12 @@ class PortalCore:
 
         # When we attest for a new token, we need some place to store the info... later we will need to 
         # mirror the other way as well
-        if p["Meta"] == "TokenBridge Attest":
-            chain_addr = self.optin(client, sender, self.tokenid, p["FromChain"], p["Contract"])
-            accts.append(chain_addr)
-
-        if p["Meta"] == "TokenBridge Transfer":
-            chain_addr = self.optin(client, sender, self.tokenid, p["FromChain"], p["Contract"])
+        if p["Meta"] == "TokenBridge Attest" or p["Meta"] == "TokenBridge Transfer":
+            if p["FromChain"] != 8:
+                chain_addr = self.optin(client, sender, self.tokenid, p["FromChain"], p["Contract"])
+            else:
+                asset_id = int.from_bytes(bytes.fromhex(p["Contract"]), "big")
+                chain_addr = self.optin(client, sender, self.tokenid, asset_id, b"native".hex())
             accts.append(chain_addr)
 
         keys = self.decodeLocalState(client, sender, self.coreid, guardian_addr)
@@ -1080,10 +1080,13 @@ class PortalCore:
             txns[-1].fee = txns[-1].fee * 2
 
         if p["Meta"] == "TokenBridge Transfer":
-            asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
             foreign_assets = []
-            if (len(asset) > 8):
-                foreign_assets.append(int.from_bytes(asset[0:8], "big"))
+            if p["FromChain"] != 8:
+                asset = (self.decodeLocalState(client, sender, self.tokenid, chain_addr))
+                if (len(asset) > 8):
+                    foreign_assets.append(int.from_bytes(asset[0:8], "big"))
+            else:
+                foreign_assets.append(int.from_bytes(bytes.fromhex(p["Contract"]), "big"))
 
             # The receiver needs to be optin in to receive the coins... Yeah, the relayer pays for this
             self.asset_optin(client, sender, foreign_assets[0], encode_address(bytes.fromhex(p["ToAddress"])))
@@ -1247,7 +1250,7 @@ class PortalCore:
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
 
-        print("Lets transfer that asset to one of our other accounts")
+        print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
         sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
         vaa = self.getVAA(client, player, sid, self.testid)
         v = self.parseVAA(bytes.fromhex(vaa))
@@ -1261,6 +1264,10 @@ class PortalCore:
               "_emitter": encode_address(v["emitter"])
              }
         pprint.pprint(s)
+
+        print(".. and lets pass that to player3")
+        self.submitVAA(bytes.fromhex(vaa), client, player3)
+
         sys.exit(0)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))

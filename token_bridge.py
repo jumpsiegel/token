@@ -400,6 +400,8 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
             Chain.store(Btoi(Extract(Txn.application_args[1], off.load(), Int(2)))),
 
+            Assert(Chain.load() != Int(8)),
+
             # We coming from the correct emitter on the sending chain for the token bridge
             Assert(App.globalGet(Concat(Bytes("Chain"), Extract(Txn.application_args[1], off.load(), Int(2)))) 
                    == Extract(Txn.application_args[1], off.load() + Int(2), Int(32))),
