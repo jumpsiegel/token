@@ -1253,22 +1253,20 @@ class PortalCore:
         print("Lets transfer that asset to one of our other accounts... first lets create the vaa")
         sid = self.transferAsset(client, player2, self.testasset, 100, player3.getAddress())
         vaa = self.getVAA(client, player, sid, self.testid)
-        v = self.parseVAA(bytes.fromhex(vaa))
-        s = { "Meta": v["Meta"],
-              "Contract": v["Contract"],
-              "_Contract": encode_address(bytes.fromhex(v["Contract"])),
-              "ToAddress": v["ToAddress"],
-              "_ToAddress": encode_address(bytes.fromhex(v["ToAddress"])),
-              "toAddress": player3.getAddress(),
-              "_emitter": v["emitter"],
-              "_emitter": encode_address(v["emitter"])
-             }
-        pprint.pprint(s)
+#        v = self.parseVAA(bytes.fromhex(vaa))
+#        s = { "Meta": v["Meta"],
+#              "Contract": v["Contract"],
+#              "_Contract": encode_address(bytes.fromhex(v["Contract"])),
+#              "ToAddress": v["ToAddress"],
+#              "_ToAddress": encode_address(bytes.fromhex(v["ToAddress"])),
+#              "toAddress": player3.getAddress(),
+#              "_emitter": v["emitter"],
+#              "_emitter": encode_address(v["emitter"])
+#             }
+#        pprint.pprint(s)
 
         print(".. and lets pass that to player3")
         self.submitVAA(bytes.fromhex(vaa), client, player3)
-
-        sys.exit(0)
 
         pprint.pprint(self.getBalances(client, player2.getAddress()))
         pprint.pprint(self.getBalances(client, player3.getAddress()))
