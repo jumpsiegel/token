@@ -437,8 +437,6 @@ def approve_token_bridge(seed_amt: int, tmpl_sig: TmplSig):
 
                    If(asset.load() == Int(0),
                       Seq([
-                          Log(Bytes("Its ALGORAND! holy poop!  THIS HAS NOT BEEN TESTED YET")),
-
                           InnerTxnBuilder.Begin(),
                           InnerTxnBuilder.SetFields(
                               {
