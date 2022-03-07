@@ -1082,7 +1082,15 @@ class PortalCore:
                 sender=sender.getAddress(),
                 index=self.tokenid,
                 on_complete=transaction.OnComplete.NoOpOC,
-                app_args=[b"nop"],
+                app_args=[b"nop", 1],
+                sp=sp
+            ))
+
+            txns.append(transaction.ApplicationCallTxn(
+                sender=sender.getAddress(),
+                index=self.tokenid,
+                on_complete=transaction.OnComplete.NoOpOC,
+                app_args=[b"nop", 2],
                 sp=sp
             ))
 
@@ -1187,6 +1195,10 @@ class PortalCore:
 
         print("bootstrapping the guardian set...")
         bootVAA = bytes.fromhex(gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, seq, seq, seq))
+        #vaa = gt.genGuardianSetUpgrade(gt.guardianPrivKeys, 1, 0, seq, seq)
+        #bootVAA = bytes.fromhex(vaa)
+        #pprint.pprint((vaa, self.parseVAA(bootVAA)))
+        #sys.exit(0)
         self.bootGuardians(bootVAA, client, foundation, self.coreid)
 
         seq += 1
@@ -1215,7 +1227,9 @@ class PortalCore:
 
         for r in range(1, 6):
             print("Registering chain " + str(r))
-            vaa = bytes.fromhex(gt.genRegisterChain(gt.guardianPrivKeys, 2, seq, seq, r))
+            v = gt.genRegisterChain(gt.guardianPrivKeys, 2, seq, seq, r)
+            vaa = bytes.fromhex(v)
+#            pprint.pprint((v, self.parseVAA(vaa)))
             self.submitVAA(vaa, client, player)
             seq += 1
 
